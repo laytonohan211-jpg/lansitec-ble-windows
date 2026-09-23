@@ -1,0 +1,40 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
+import "characteristic_tile.dart";
+
+class ServiceTile extends StatelessWidget {
+  final BluetoothService service;
+  final List<CharacteristicTile> characteristicTiles;
+
+  const ServiceTile({
+    super.key,
+    required this.service,
+    required this.characteristicTiles,
+  });
+
+  Widget buildUuid(BuildContext context) {
+    String uuid = '0x${service.uuid.str.toUpperCase()}';
+    return Text(uuid, style: TextStyle(color: Theme.of(context).primaryColor));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return characteristicTiles.isNotEmpty
+        ? ExpansionTile(
+          title: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              // Text(
+              //   'Service',
+              //   style: TextStyle(color: Theme.of(context).primaryColor),
+              // ),
+              buildUuid(context),
+            ],
+          ),
+          children: characteristicTiles,
+        )
+        : ListTile(title: buildUuid(context));
+  }
+}
