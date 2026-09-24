@@ -2,9 +2,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'beacon_values.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'device_profile.dart';
-import 'snapshot.dart';
+import 'feedback.dart' show wireHex;
 
 class BeaconSnapshot extends StatefulWidget {
   final BluetoothDevice device;
@@ -20,6 +21,7 @@ class BeaconSnapshot extends StatefulWidget {
 
 class _BeaconSnapshotState extends State<BeaconSnapshot> {
   Map<String, List<int>> values = {};
+  final Map<String, String> errors = {};
   bool busy = false, attempted = false;
   int epoch = 0;
   final editors = <TextEditingController>[];
@@ -66,6 +68,7 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
       busy = true;
       attempted = true;
       values.clear();
+      errors.clear();
       status = 'Reading…';
     });
     final readers = <String, Future<List<int>> Function()>{},
@@ -81,23 +84,28 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
             !c.properties.read)
           continue;
         if (readers.containsKey(id)) duplicates.add(id);
-        readers[id] = () => c.read(timeout: 2);
+        readers[id] = () => c.read(timeout: 5);
       }
     }
     for (final id in duplicates) {
       readers.remove(id);
     }
-    final result = await readSnapshotOnce(
-      readers,
-      active: () => mounted && epoch == generation && widget.device.isConnected,
-    );
+    final result = <String, List<int>>{};
+    for (final entry in readers.entries) {
+      if (!mounted || epoch != generation || !widget.device.isConnected) break;
+      try {
+        result[entry.key] = List.of(await entry.value());
+      } catch (e) {
+        errors[entry.key] = e.toString();
+      }
+    }
     if (!mounted) return;
     setState(() {
       busy = false;
       if (epoch != generation || !widget.device.isConnected) return;
-      values = result.values;
+      values = result;
       status =
-          'Read ${values.length} parameters${result.incomplete ? ' · partial result' : ''}';
+          'Read ${values.length} parameters${errors.isNotEmpty ? ' · ${errors.length} unavailable: check PIN / connection, then Refresh' : ''}';
     });
   }
 
@@ -267,6 +275,23 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
           ],
         ),
         Text(status),
+        TextButton.icon(
+          onPressed: () async {
+            final report = [
+              'Ls BLE Guided 1.3.4 — beacon',
+              'Name: ${widget.device.platformName}',
+              for (final s in widget.services)
+                'Service ${s.uuid.str}: ${s.characteristics.map((c) => '${c.uuid.str} read=${c.properties.read} write=${c.properties.write || c.properties.writeWithoutResponse}').join(', ')}',
+              for (final e in values.entries) '${e.key}: ${wireHex(e.value)}',
+              for (final e in errors.entries) '${e.key}: ${e.value}',
+            ].join('\n');
+            await Clipboard.setData(ClipboardData(text: report));
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Beacon diagnostics copied')));
+          },
+          icon: const Icon(Icons.copy),
+          label: const Text('Copy beacon diagnostics'),
+        ),
         if (busy) const LinearProgressIndicator(),
         if (busy && status == 'Reading…' && widget.device.isConnected)
           Semantics(
@@ -287,7 +312,9 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
               title: Text(beaconSettingNames[id]!),
               subtitle: Text(
                 values[id] == null
-                    ? (busy ? 'Reading…' : 'Not read')
+                    ? (busy ? 'Reading…' : errors.containsKey(id)
+                        ? 'Read failed · check PIN / connection, then Refresh'
+                        : 'Not readable on this device')
                     : beaconValue(id, values[id]!) == null
                     ? 'Format not supported · see advanced tools'
                     : '${beaconValue(id, values[id]!)} ${beaconUnit(id)}'

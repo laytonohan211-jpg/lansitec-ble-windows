@@ -37,7 +37,32 @@ class BeaconInterval extends BluetoothCharacteristic {
   }
 }
 
+class UnreadableBeaconField extends BluetoothCharacteristic {
+  UnreadableBeaconField(String id) : super(
+    remoteId: const DeviceIdentifier('test-device'),
+    serviceUuid: Guid('fff0'), characteristicUuid: Guid(id));
+  @override
+  CharacteristicProperties get properties => const CharacteristicProperties(read: true);
+  @override
+  Future<List<int>> read({int timeout = 15}) async => throw StateError('Access denied');
+}
+
 void main() {
+  testWidgets('unreadable fields do not stop automatic beacon snapshot', (tester) async {
+    final d = FakeDevice(), interval = BeaconInterval(true);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(
+      child: BeaconSnapshot(device: d, services: [FakeService([
+        UnreadableBeaconField('fff5'), UnreadableBeaconField('fff6'), interval,
+      ])]),
+    ))));
+    await tester.pumpAndSettle();
+    expect(interval.reads, 1);
+    expect(interval.sent, isEmpty);
+    expect(find.text('500 ms'), findsOneWidget);
+    expect(find.textContaining('2 unavailable'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await d.changes.close();
+  });
   for (final accept in [true, false]) {
     testWidgets('beacon numeric Apply and readback; accept=$accept', (
       tester,

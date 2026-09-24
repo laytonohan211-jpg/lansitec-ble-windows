@@ -2,6 +2,7 @@ import '../guided/disconnect_guard.dart';
 import '../guided/beacon_snapshot.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import '../guided/device_profile.dart';
 import '../guided/help_page.dart';
 import '../guided/device_setup_page.dart';
@@ -53,6 +54,9 @@ class _PeripheralCharacteristicsPageState
   bool? _manualBeacon;
   bool _pairing = false;
   String _pairingStatus = '';
+  bool _discovering = false;
+  String _discoveryError = '';
+  int _serviceGeneration = 0;
   RadioFamily? get _radio => detectRadio(
     _services.map((s) => s.uuid.str),
     _services
@@ -106,8 +110,10 @@ class _PeripheralCharacteristicsPageState
     if (widget.descCache != null) {
       _descCache.addAll(widget.descCache!);
     }
-    if (_services.isNotEmpty && _descCache.isEmpty) {
-      unawaited(_loadDescriptionsInBackground());
+    // Known GATT profiles already supply labels. Do not compete with the
+    // initial parameter read by fetching every descriptor in the background.
+    if (!_beaconGatt && _radio == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshProfile());
     }
 
     _connectionStateSubscription = widget.device.connectionState.listen((
@@ -169,6 +175,27 @@ class _PeripheralCharacteristicsPageState
             title: const Text('Beacon setup'),
             actions: [
               IconButton(
+                tooltip: 'Refresh device profile',
+                onPressed: _discovering ? null : _refreshProfile,
+                icon: const Icon(Icons.refresh),
+              ),
+              IconButton(
+                tooltip: 'Copy device diagnostics',
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: [
+                    'Ls BLE Guided 1.3.4 — device profile',
+                    'Name: ${widget.device.platformName}',
+                    'Beacon profile: $_beaconGatt',
+                    for (final s in _services)
+                      'Service ${s.uuid.str}: ${s.characteristics.map((c) => c.uuid.str).join(', ')}',
+                    if (_discoveryError.isNotEmpty) _discoveryError,
+                  ].join('\n')));
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Device diagnostics copied')));
+                },
+                icon: const Icon(Icons.copy),
+              ),
+              IconButton(
                 tooltip: 'User guide',
                 icon: const Icon(Icons.help_outline),
                 onPressed:
@@ -183,6 +210,9 @@ class _PeripheralCharacteristicsPageState
             child: Column(
               children: <Widget>[
                 buildDeviceOverviewTile(context),
+                if (_discovering) const LinearProgressIndicator(),
+                if (_discoveryError.isNotEmpty) Padding(
+                  padding: const EdgeInsets.all(16), child: Text(_discoveryError)),
                 if (!_isBeacon && _manualBeacon == null)
                   Padding(
                     padding: const EdgeInsets.all(16),
@@ -193,7 +223,7 @@ class _PeripheralCharacteristicsPageState
                         ),
                         FilledButton(
                           onPressed: () => setState(() => _manualBeacon = true),
-                          child: const Text('Beacon — manual setup'),
+                          child: const Text('Beacon — show available settings'),
                         ),
                         TextButton(
                           onPressed:
@@ -205,7 +235,10 @@ class _PeripheralCharacteristicsPageState
                   ),
                 if (_isBeacon) ...[
                   if (_beaconGatt)
-                    BeaconSnapshot(device: widget.device, services: _services),
+                    BeaconSnapshot(key: ValueKey(_serviceGeneration), device: widget.device, services: _services),
+                  if (!_beaconGatt && !_discovering)
+                    const Padding(padding: EdgeInsets.all(16), child: Text(
+                      'Automatic settings require a supported beacon GATT profile. Refresh the device profile while the beacon is in configuration mode. If unavailable, copy device diagnostics using the top button.')),
                   if (_beaconGatt)
                     const ListTile(
                       leading: Icon(Icons.check_circle_outline),
@@ -274,6 +307,23 @@ class _PeripheralCharacteristicsPageState
     _connectionStateSubscription.cancel();
     _mtuSubscription.cancel();
     super.dispose();
+  }
+
+  Future<void> _refreshProfile() async {
+    if (!mounted || _discovering || !widget.device.isConnected) return;
+    setState(() { _discovering = true; _discoveryError = ''; });
+    try {
+      final services = await widget.device.discoverServices();
+      if (!mounted) return;
+      setState(() {
+        _services = services;
+        _serviceGeneration++;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _discoveryError = 'Profile discovery failed: $e');
+    } finally {
+      if (mounted) setState(() => _discovering = false);
+    }
   }
 
   void _disconnectOnExit() {

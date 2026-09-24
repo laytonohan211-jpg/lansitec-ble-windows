@@ -960,7 +960,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
             child: ListTile(
               title: Text(settingName(p)),
               subtitle: Text(
-                '${current.containsKey(p.id) ? valueLabel(p, current[p.id]!) : 'Current: not returned by firmware'}${lastSent.containsKey(p.id) ? '\nLast sent: ${valueLabel(p, lastSent[p.id]!)}${current.containsKey(p.id)
+                '${current.containsKey(p.id) ? valueLabel(p, current[p.id]!) : 'Current: no valid reply received'}${lastSent.containsKey(p.id) ? '\nLast sent: ${valueLabel(p, lastSent[p.id]!)}${current.containsKey(p.id)
                         ? freshRead.contains(p.id)
                             ? current[p.id] == lastSent[p.id]
                                 ? ' · verified'
@@ -1432,7 +1432,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     await Clipboard.setData(
       ClipboardData(
         text:
-            'Ls BLE Guided 1.3.3\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${trace.join('\n')}',
+            'Ls BLE Guided 1.3.4\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${trace.join('\n')}',
       ),
     );
     message('Diagnostics copied.');

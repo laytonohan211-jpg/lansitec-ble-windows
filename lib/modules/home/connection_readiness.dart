@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../utils/ble_scan_coordinator.dart';
+import '../../utils/windows_bluetooth_state.dart';
 
 class ConnectionReadiness extends StatefulWidget {
   final Widget child;
@@ -17,6 +18,8 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
     with WidgetsBindingObserver {
   static const channel = MethodChannel('lansitec/connection');
   StreamSubscription<BluetoothAdapterState>? adapterSubscription;
+  Timer? windowsStateTimer;
+  bool checking = false;
   bool loading = true,
       working = false,
       allowed = false,
@@ -31,6 +34,7 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     adapterSubscription = FlutterBluePlus.adapterState.listen((state) {
+      if (Platform.isWindows) return; // Query live state below, not cached state.
       if (mounted) {
         setState(() => bluetooth = state == BluetoothAdapterState.on);
         if (!bluetooth) autoScanStarted = false;
@@ -38,6 +42,13 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
       }
     });
     check();
+    if (Platform.isWindows) {
+      windowsStateTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+          check();
+        }
+      });
+    }
   }
 
   @override
@@ -72,6 +83,8 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
   }
 
   Future<void> check() async {
+    if (checking) return;
+    checking = true;
     try {
       bool permissions;
       bool enabled;
@@ -90,6 +103,13 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
       } else if (Platform.isWindows) {
         enabled = true;
         permissions = true;
+        final on = await readWindowsBluetoothEnabled();
+        if (!mounted) return;
+        bluetooth = on;
+        if (!on) {
+          autoScanStarted = false;
+          await BleScanCoordinator.instance.stop(BleScanCoordinator.devicesOwner);
+        }
       } else {
         enabled = true;
         permissions = await Permission.bluetooth.isGranted;
@@ -99,6 +119,7 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
           allowed = permissions;
           location = enabled;
           loading = false;
+          error = '';
         });
       startWhenReady();
     } catch (e) {
@@ -107,6 +128,8 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
           loading = false;
           error = 'Could not check settings: $e';
         });
+    } finally {
+      checking = false;
     }
   }
 
@@ -190,6 +213,7 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     adapterSubscription?.cancel();
+    windowsStateTimer?.cancel();
     super.dispose();
   }
 
@@ -212,7 +236,7 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
             Platform.isAndroid
                 ? 'Enable Bluetooth and Location to find nearby devices. Android will ask for permission.'
                 : Platform.isWindows
-                ? 'Enable Bluetooth in Windows Settings. If a device requires a PIN, pair it there first.'
+                ? 'Enable Bluetooth in Windows Settings, then return here. Devices are scanned and connected inside this app; pairing is only needed when the device requires a PIN.'
                 : 'Enable Bluetooth and allow this app to use it. On iPhone: Settings → Bluetooth; then Settings → Privacy & Security → Bluetooth.',
           ),
           for (final entry

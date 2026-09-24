@@ -5,15 +5,26 @@ import 'protocol.dart';
 String wireHex(List<int> bytes) =>
     bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join().toUpperCase();
 List<int> payloadBytes(List<int> input) {
-  try {
-    final h = cleanHex(utf8.decode(input).replaceAll('\u0000', '').trim());
-    if (h.startsWith('60'))
-      return [
-        for (var i = 0; i < h.length; i += 2)
-          int.parse(h.substring(i, i + 2), radix: 16),
-      ];
-  } catch (_) {}
-  return input;
+  var bytes = input;
+  // FF11 capture 2026-09-24: some replies wrap ASCII hex twice.
+  // Never trim binary payloads: trailing zero bytes can be real values.
+  for (var depth = 0; depth < 2; depth++) {
+    if (bytes.isNotEmpty && bytes.first == 0x60) return bytes;
+    try {
+      final text = utf8.decode(bytes);
+      final zero = text.indexOf('\u0000');
+      if (zero >= 0 && text.substring(zero).runes.any((c) => c != 0)) {
+        return input;
+      }
+      final h = (zero < 0 ? text : text.substring(0, zero)).trim();
+      if (h.length.isOdd || !RegExp(r'^[0-9a-fA-F]+$').hasMatch(h)) {
+        return input;
+      }
+      bytes = [for (var i = 0; i < h.length; i += 2)
+        int.parse(h.substring(i, i + 2), radix: 16)];
+    } catch (_) { return input; }
+  }
+  return bytes.isNotEmpty && bytes.first == 0x60 ? bytes : input;
 }
 
 Map<int, String> parameterResponse(List<int> input, String model) {

@@ -164,10 +164,12 @@ bool detectBeaconGatt(
 ) {
   if (!services.map(shortUuid).contains('fff0')) return false;
   final ids = characteristics.map(shortUuid).toSet();
-  // Require the five core beacon fields together; FFF0 alone is also used by LTE.
-  // Cellular evidence takes precedence over a shared or mixed profile.
+  // Some firmware exposes only part of the shared beacon profile.
+  // UUID + Major + Minor identify it without requiring optional radio settings.
+  // Cellular evidence takes precedence; never infer a writable profile by name.
   return !ids.containsAll(['ff05', 'ff11', 'ff12']) &&
-      ids.containsAll(['fff5', 'fff6', 'fff7', 'fff8', 'fff9']);
+      (ids.containsAll(['fff5', 'fff6', 'fff7']) ||
+       ids.containsAll(['fff8', 'fff9', 'fff5']));
 }
 
 String? detectBeaconModel(String name) {

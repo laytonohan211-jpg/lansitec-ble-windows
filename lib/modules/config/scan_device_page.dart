@@ -1,3 +1,4 @@
+import '../../utils/stable_scan_stream.dart';
 import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
@@ -94,7 +95,10 @@ class _ScanDevicePageState extends State<ScanDevicePage>
       BleScanCoordinator.batchConfigOwner,
     );
 
-    _scanResultsSubscription = FlutterBluePlus.scanResults.listen(
+    _scanResultsSubscription = stableScanStream<ScanResult>(FlutterBluePlus.scanResults,
+      id: (r) => r.device.remoteId.str,
+      compareNew: (a, b) => b.rssi.compareTo(a.rssi),
+    ).listen(
       (results) {
         if (!mounted) return;
         final hasOwnership = _scanCoordinator.isOwnerActive(
@@ -127,8 +131,7 @@ class _ScanDevicePageState extends State<ScanDevicePage>
                   if (versionMismatchIds.contains(deviceId)) return false;
 
                   return true;
-                }).toList()
-                ..sort((a, b) => b.rssi.compareTo(a.rssi));
+                }).toList();
         });
       },
       onError: (e) {

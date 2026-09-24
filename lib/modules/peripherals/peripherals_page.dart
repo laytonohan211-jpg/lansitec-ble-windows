@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import '../../utils/stable_scan_stream.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,23 +32,13 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
   void initState() {
     super.initState();
 
-    _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
-      if (!mounted) return;
-      if (!BleScanCoordinator.instance.isOwnerActive(
-        BleScanCoordinator.devicesOwner,
-      )) {
-        return;
-      }
-
-      setState(() {
-        scanResults =
-            results.where((r) {
-                final name = r.device.platformName;
-                if (name.isEmpty) return false;
-                return true;
-              }).toList()
-              ..sort((a, b) => b.rssi.compareTo(a.rssi));
-      });
+    _scanResultsSubscription = stableScanStream<ScanResult>(
+      FlutterBluePlus.scanResults.where((_) => BleScanCoordinator.instance
+          .isOwnerActive(BleScanCoordinator.devicesOwner)),
+      id: (r) => r.device.remoteId.str,
+      compareNew: (a, b) => b.rssi.compareTo(a.rssi),
+    ).listen((results) {
+      if (mounted) setState(() => scanResults = results);
     });
   }
 
@@ -71,9 +63,9 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
           final searchText = searchController.text.trim().toLowerCase();
           final filteredResults =
               scanResults.where((r) {
-                final name = r.device.platformName;
-                if (name.isEmpty) return false;
-                if (!name.toLowerCase().startsWith(searchText)) {
+                final name = _scanName(r);
+                
+                if (!name.toLowerCase().contains(searchText) && !r.device.remoteId.str.toLowerCase().contains(searchText)) {
                   return false;
                 }
                 if (rssiEnabled && r.rssi < minRssi) return false;
@@ -101,7 +93,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
                     TextField(
                       controller: searchController,
                       decoration: InputDecoration(
-                        labelText: 'Search devices by name',
+                        labelText: 'Search name or Bluetooth address',
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.search),
                         isDense: true,
@@ -143,10 +135,11 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
                       return Column(
                         children: [
                           ListTile(
+                            key: ValueKey(result.device.remoteId.str),
                             dense: true,
                             visualDensity: const VisualDensity(vertical: -4),
                             title: Text(
-                              result.device.platformName,
+                              _scanName(result),
                               style: const TextStyle(fontSize: 14),
                             ),
                             leading: rssiIcon(result.rssi),
@@ -286,11 +279,13 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
 
       // 2️⃣ 移除残留配对（仅 Android）
       try {
+        if (Platform.isAndroid) {
         BluetoothBondState state = await device.bondState.first;
         if (state == BluetoothBondState.bonded) {
           print("移除旧配对中...");
           await device.removeBond();
           await Future.delayed(const Duration(milliseconds: 500)); // 等待解除
+        }
         }
       } catch (_) {}
       throwIfCanceled();
@@ -302,7 +297,8 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
         (s) => s == BluetoothConnectionState.connected,
       );
       throwIfCanceled();
-      // 等待bonded
+      // Pairing is an Android-specific wait; Windows connects directly.
+      if (Platform.isAndroid) {
       try {
         await device.bondState
             .firstWhere((s) => s == BluetoothBondState.bonded)
@@ -310,6 +306,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
       } catch (_) {}
       throwIfCanceled();
 
+      }
       // small delay
       await Future.delayed(const Duration(milliseconds: 500));
       throwIfCanceled();
@@ -334,8 +331,15 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop(false);
       debugPrint("Connect Error ${device.advName}: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connection failed: $e')));
     }
   }
+
+  String _scanName(ScanResult result) => result.advertisementData.advName.isNotEmpty
+      ? result.advertisementData.advName
+      : result.device.platformName.isNotEmpty
+          ? result.device.platformName
+          : 'Unnamed BLE device';
 
   Widget rssiIcon(int rssi) {
     // 将 RSSI 映射为 0~5 级信号
