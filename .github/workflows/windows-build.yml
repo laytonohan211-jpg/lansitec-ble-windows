@@ -15,9 +15,32 @@ jobs:
           flutter-version: '3.29.0'
           channel: stable
           cache: true
-      - name: Validate and build
+      - name: Prepare dependencies
         shell: pwsh
-        run: ./build_windows.ps1
+        run: |
+          flutter config --enable-windows-desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter configuration failed' }
+          flutter pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency resolution failed' }
+      - name: Analyze code
+        shell: pwsh
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Code analysis failed' }
+      - name: Run regression tests
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          flutter test test/guided --timeout 60s
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+      - name: Compile Windows application
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          flutter build windows --release
+          if ($LASTEXITCODE -ne 0) { throw 'Windows compilation failed' }
+          if (-not (Test-Path 'build/windows/x64/runner/Release/Ls_BLE_Guided.exe')) { throw 'Executable missing' }
+          New-Item -ItemType Directory -Force dist | Out-Null
       - name: Include runtime and create installer
         shell: pwsh
         run: |

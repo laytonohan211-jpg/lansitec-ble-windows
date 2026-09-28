@@ -54,28 +54,34 @@ void main() {
     expect(await readWindowsBluetoothEnabled(), isFalse);
     expect(calls, 3);
   });
-  testWidgets('scan publishes once per second without moving existing rows', (tester) async {
+  test('scan publishes once per second without moving existing rows', () async {
     final source = StreamController<List<(String, int)>>();
     final events = <List<(String, int)>>[];
+    final first = Completer<void>(), second = Completer<void>();
+    final elapsed = Stopwatch()..start();
     final sub = stableScanStream<(String, int)>(source.stream,
       id: (v) => v.$1, compareNew: (a, b) => b.$2.compareTo(a.$2),
-    ).listen(events.add);
+    ).listen((items) {
+      events.add(items);
+      if (events.length == 1) first.complete();
+      if (events.length == 2) second.complete();
+    });
+    addTearDown(() async { await sub.cancel(); await source.close(); });
     source.add([('A', -40), ('B', -70)]);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 999));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(events, isEmpty);
-    await tester.pump(const Duration(milliseconds: 1));
+    await first.future.timeout(const Duration(seconds: 5));
+    expect(elapsed.elapsedMilliseconds, greaterThanOrEqualTo(1000));
     expect(events.single.map((x) => x.$1), ['A', 'B']);
     source.add([('B', -30), ('A', -90), ('C', -20)]);
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
+    await second.future.timeout(const Duration(seconds: 5));
     expect(events.last.map((x) => x.$1), ['A', 'B', 'C']);
     expect(events.last.first.$2, -90);
     source.add([('A', -50)]);
-    await tester.pump();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     await sub.cancel();
-    await tester.pump(const Duration(seconds: 2));
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
     expect(events.length, 2);
     await source.close();
-  });
+  }, timeout: const Timeout(Duration(seconds: 20)));
 }
