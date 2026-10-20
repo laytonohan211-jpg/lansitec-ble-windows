@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../utils/ble_scan_coordinator.dart';
-import '../../utils/windows_bluetooth_state.dart';
 
 class ConnectionReadiness extends StatefulWidget {
   final Widget child;
@@ -18,7 +17,6 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
     with WidgetsBindingObserver {
   static const channel = MethodChannel('lansitec/connection');
   StreamSubscription<BluetoothAdapterState>? adapterSubscription;
-  Timer? windowsStateTimer;
   bool checking = false;
   bool loading = true,
       working = false,
@@ -34,7 +32,6 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     adapterSubscription = FlutterBluePlus.adapterState.listen((state) {
-      if (Platform.isWindows) return; // Query live state below, not cached state.
       if (mounted) {
         setState(() => bluetooth = state == BluetoothAdapterState.on);
         if (!bluetooth) autoScanStarted = false;
@@ -42,13 +39,6 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
       }
     });
     check();
-    if (Platform.isWindows) {
-      windowsStateTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-        if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-          check();
-        }
-      });
-    }
   }
 
   @override
@@ -93,22 +83,14 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
             await channel.invokeMapMethod<String, dynamic>('status') ?? {};
         sdk = info['sdk'] as int? ?? 0;
         enabled = info['location'] == true;
+        bluetooth = info['bluetooth'] == true;
+        if (!bluetooth) autoScanStarted = false;
         permissions = await Permission.locationWhenInUse.isGranted;
         if (sdk >= 31) {
           permissions =
               permissions &&
               await Permission.bluetoothScan.isGranted &&
               await Permission.bluetoothConnect.isGranted;
-        }
-      } else if (Platform.isWindows) {
-        enabled = true;
-        permissions = true;
-        final on = await readWindowsBluetoothEnabled();
-        if (!mounted) return;
-        bluetooth = on;
-        if (!on) {
-          autoScanStarted = false;
-          await BleScanCoordinator.instance.stop(BleScanCoordinator.devicesOwner);
         }
       } else {
         enabled = true;
@@ -139,11 +121,6 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
       error = '';
     });
     try {
-      if (Platform.isWindows) {
-        await openConnectionSettings();
-        await check();
-        return;
-      }
       final required =
           Platform.isAndroid
               ? [
@@ -200,20 +177,10 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
     }
   }
 
-  Future<void> openConnectionSettings() async {
-    if (Platform.isWindows) {
-      // Fixed system URI; no device/user data is interpolated into a shell.
-      await Process.run('explorer.exe', ['ms-settings:bluetooth']);
-    } else {
-      await openAppSettings();
-    }
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     adapterSubscription?.cancel();
-    windowsStateTimer?.cancel();
     super.dispose();
   }
 
@@ -235,13 +202,11 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
           Text(
             Platform.isAndroid
                 ? 'Enable Bluetooth and Location to find nearby devices. Android will ask for permission.'
-                : Platform.isWindows
-                ? 'Enable Bluetooth in Windows Settings, then return here. Devices are scanned and connected inside this app; pairing is only needed when the device requires a PIN.'
                 : 'Enable Bluetooth and allow this app to use it. On iPhone: Settings → Bluetooth; then Settings → Privacy & Security → Bluetooth.',
           ),
           for (final entry
               in {
-                if (!Platform.isWindows) 'Permissions': allowed,
+                'Permissions': allowed,
                 'Bluetooth': bluetooth,
                 if (Platform.isAndroid) 'Location / GPS services': location,
               }.entries)
@@ -256,17 +221,12 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
             ),
           FilledButton(
             onPressed: working ? null : enable,
-            child: Text(
-              Platform.isWindows
-                  ? 'Open Bluetooth settings'
-                  : 'Enable and continue',
-            ),
+            child: const Text('Enable and continue'),
           ),
-          if (!Platform.isWindows)
-            TextButton(
-              onPressed: working ? null : openConnectionSettings,
-              child: const Text('App settings'),
-            ),
+          TextButton(
+            onPressed: working ? null : () => openAppSettings(),
+            child: const Text('App settings'),
+          ),
           if (Platform.isAndroid)
             TextButton(
               onPressed:
@@ -284,15 +244,13 @@ class _ConnectionReadinessState extends State<ConnectionReadiness>
           if (working) const LinearProgressIndicator(),
           if (error.isNotEmpty) Text(error),
           const SizedBox(height: 16),
-          if (Platform.isAndroid)
-            const Text(
-              'If needed on Android: Settings → Bluetooth → On; Settings → Location → On. In app permissions allow Nearby devices and Location while using the app. Names vary by phone.',
-            ),
+          const Text(
+            'If needed on Android: Settings → Bluetooth → On; Settings → Location → On. In app permissions allow Nearby devices and Location while using the app. Names vary by phone.',
+          ),
           const SizedBox(height: 8),
-          if (!Platform.isWindows)
-            const Text(
-              'Pairing is separate from connecting. If your beacon requires a PIN, use Pair on its setup page and enter the PIN supplied with the device.',
-            ),
+          const Text(
+            'Pairing is separate from connecting. If your beacon requires a PIN, use Pair on its setup page and enter the PIN supplied with the device.',
+          ),
         ],
       ),
     );

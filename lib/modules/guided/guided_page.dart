@@ -1,4 +1,3 @@
-import 'uplink_decoder.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -992,15 +991,18 @@ class _GuidedPageState extends State<GuidedPage> {
                 ? null
                 : () => run(() async {
                   final h = cleanHex(uplink.text);
-                  final result = await decodeUplink(
-                    model!.contains('Gateway')
-                        ? 'gateway'
-                        : model!.contains('Container')
-                        ? 'container'
-                        : 'badge',
-                    h,
-                  );
-                  final data = jsonDecode(result);
+                  final result = await const MethodChannel(
+                    'lansitec/decoder',
+                  ).invokeMethod<String>('decode', {
+                    'family':
+                        model!.contains('Gateway')
+                            ? 'gateway'
+                            : model!.contains('Container')
+                            ? 'container'
+                            : 'badge',
+                    'payload': h,
+                  });
+                  final data = jsonDecode(result ?? '{}');
                   if (data is Map && data['error'] != null) {
                     throw FormatException('${data['error']}');
                   }

@@ -1,0 +1,47 @@
+name: Build Android LoRaWAN
+on:
+  push:
+    branches: [android-lorawan-1.4]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: stable
+          cache: true
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Analyze
+        run: flutter analyze lib test/guided --no-fatal-infos --no-fatal-warnings
+      - name: Tests
+        run: flutter test test/guided --timeout 60s
+      - name: Prepare Android wrapper
+        run: |
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "sdk.dir=$ANDROID_HOME" >> android/local.properties
+          gradle -p android wrapper --gradle-version 8.10.2
+      - name: Build APK
+        run: flutter build apk --release
+      - name: Bundle unsigned APK for local signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk dist/UNSIGNED-app.apk
+          (cd dist && sha256sum UNSIGNED-app.apk > SHA256SUMS && zip Android-1.4.0-unsigned-build.zip UNSIGNED-app.apk SHA256SUMS)
+          TAG=android-1.4.0-build.${{ github.run_number }}
+          gh release create "$TAG" dist/Android-1.4.0-unsigned-build.zip --target "$GITHUB_SHA" --prerelease --title "Android 1.4.0 build ${{ github.run_number }} — unsigned intermediate" --notes "Build intermediate only. This unsigned APK requires local signing with the existing app key before installation."

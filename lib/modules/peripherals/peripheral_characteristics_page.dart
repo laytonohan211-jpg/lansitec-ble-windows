@@ -1,3 +1,5 @@
+import '../guided/lorawan_protocol.dart';
+import '../guided/lorawan_setup_page.dart';
 import '../guided/disconnect_guard.dart';
 import '../guided/beacon_snapshot.dart';
 import 'dart:async';
@@ -63,6 +65,7 @@ class _PeripheralCharacteristicsPageState
         .where((s) => shortUuid(s.uuid.str) == 'fff0')
         .expand((s) => s.characteristics.map((c) => c.uuid.str)),
   );
+  bool get _loRaGatt => _services.any((s) => isLoRaGatt(s.characteristics.map((c) => c.uuid.str)));
   bool get _beaconGatt => detectBeaconGatt(
     _services.map((s) => s.uuid.str),
     _services
@@ -112,7 +115,7 @@ class _PeripheralCharacteristicsPageState
     }
     // Known GATT profiles already supply labels. Do not compete with the
     // initial parameter read by fetching every descriptor in the background.
-    if (!_beaconGatt && _radio == null) {
+    if (!_loRaGatt && !_beaconGatt && _radio == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refreshProfile());
     }
 
@@ -157,6 +160,7 @@ class _PeripheralCharacteristicsPageState
 
   @override
   Widget build(BuildContext context) {
+    if (_loRaGatt) return LoRaSetupPage(key: ValueKey(_serviceGeneration), device: widget.device, services: _services);
     if (!_isBeacon && (_radio != null || _manualBeacon == false)) {
       return DeviceSetupPage(
         device: widget.device,
@@ -183,7 +187,7 @@ class _PeripheralCharacteristicsPageState
                 tooltip: 'Copy device diagnostics',
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: [
-                    'Ls BLE Guided 1.3.4 — device profile',
+                    'Ls BLE Guided 1.4.0 — device profile',
                     'Name: ${widget.device.platformName}',
                     'Beacon profile: $_beaconGatt',
                     for (final s in _services)

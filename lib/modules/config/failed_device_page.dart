@@ -8,7 +8,7 @@ import 'package:flutter_blue/modules/device/domain/failed_device.dart';
 import 'package:flutter_blue/utils/services/overlay_service/i_overlay_service.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
-import 'package:flutter_blue/utils/export_directory.dart';
+import 'package:path_provider/path_provider.dart';
 
 class FailedDevicePage extends StatefulWidget {
   const FailedDevicePage({super.key});
@@ -291,7 +291,14 @@ class _FailedDevicePageState extends State<FailedDevicePage> {
         }
 
         try {
-          final downloadsDir = await exportDirectory();
+          Directory? externalDir = await getExternalStorageDirectory();
+          if (externalDir == null) return;
+
+          String downloadsPath =
+              "${externalDir.path.split('Android')[0]}Download";
+          Directory downloadsDir = Directory(downloadsPath);
+          if (!await downloadsDir.exists())
+            await downloadsDir.create(recursive: true);
 
           String timestamp = DateFormat(
             'yyyyMMdd_HHmmss',
@@ -302,7 +309,8 @@ class _FailedDevicePageState extends State<FailedDevicePage> {
           await file.writeAsString(csv);
 
           overlayService.showSuccessNotification(
-            (context) => "Export successful: ${file.path}",
+            (context) =>
+                "Export successful: Download/${file.path.split('Download').last.replaceFirst('/', '')}",
             duration: const Duration(milliseconds: 2000),
           );
         } catch (e) {

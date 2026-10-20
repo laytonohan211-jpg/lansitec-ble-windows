@@ -1,5 +1,4 @@
 import '../../utils/stable_scan_stream.dart';
-import 'dart:io';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -131,7 +130,8 @@ class _ScanDevicePageState extends State<ScanDevicePage>
                   if (versionMismatchIds.contains(deviceId)) return false;
 
                   return true;
-                }).toList();
+                }).toList()
+                ;
         });
       },
       onError: (e) {
@@ -1101,11 +1101,6 @@ class _ScanDevicePageState extends State<ScanDevicePage>
     required String pin,
     int maxAttempts = 3,
   }) async {
-    if (Platform.isWindows) {
-      // Pair in Windows Settings before starting a protected batch.
-      // GATT writes still fail visibly if the device is not authorized.
-      return true;
-    }
     int attempt = 0;
 
     while (attempt < maxAttempts) {

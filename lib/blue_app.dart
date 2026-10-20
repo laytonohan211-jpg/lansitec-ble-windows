@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_blue/config/routes/go_router.dart';
@@ -43,44 +42,16 @@ class _BlueAppState extends State<FlutterBlueApp> with WidgetsBindingObserver {
         ],
         child: MaterialApp.router(
           debugShowCheckedModeBanner: false,
-          title: 'Ls BLE Guided',
-          builder:
-              (context, child) =>
-                  Platform.isWindows
-                      ? Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1100),
-                          child: child ?? const SizedBox.shrink(),
-                        ),
-                      )
-                      : child ?? const SizedBox.shrink(),
+          title: 'BluePilot',
           theme: ThemeData(
             useMaterial3: true,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF176BDA),
-            ),
+            colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF176BDA)),
             scaffoldBackgroundColor: const Color(0xFFF5F7FA),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-            ),
-            cardTheme: CardTheme(
-              color: Colors.white,
-              elevation: 0,
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            filledButtonTheme: FilledButtonThemeData(
-              style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
-            ),
-            outlinedButtonTheme: OutlinedButtonThemeData(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-            ),
-            inputDecorationTheme: const InputDecorationTheme(
-              border: OutlineInputBorder(),
-            ),
+            appBarTheme: const AppBarTheme(backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
+            cardTheme: CardTheme(color: Colors.white, elevation: 0, margin: const EdgeInsets.symmetric(vertical: 4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+            filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(48,48))),
+            outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(48,48))),
+            inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
           ),
           routerConfig: getIt<AppRouter>().router,
         ),
