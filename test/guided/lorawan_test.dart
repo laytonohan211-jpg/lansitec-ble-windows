@@ -53,6 +53,7 @@ void main() {
     expect(loRaReadValue(utf8.encode('EU868\u0000')), contains('EU868'));
   });
   test('Cellular ASCII hex feedback remains supported', () {
-    expect(payloadBytes(utf8.encode('9009')), [0x90, 0x09]);
+    expect(payloadBytes(utf8.encode('600509')), [0x60, 0x05, 0x09]);
   });
 }
+
