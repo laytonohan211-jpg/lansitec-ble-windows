@@ -42,9 +42,10 @@ void main() {
     expect(fields.map((c) => c.reads), [1,1,1,0,0,0]);
     expect(fields.every((c) => c.sent.isEmpty), isTrue);
     expect(find.textContaining('Read 2 fields'), findsOneWidget);
-    expect(find.textContaining('Could not read.'), findsOneWidget);
+    expect(find.textContaining('Read failed'), findsOneWidget);
     expect(find.textContaining('Sent '), findsNothing);
     await tester.pumpWidget(const SizedBox());
     await device.changes.close();
   });
 }
+

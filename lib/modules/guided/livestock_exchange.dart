@@ -11,6 +11,7 @@ Future<List<int>> livestockExchange(BluetoothCharacteristic c, List<int> request
     if(result.isCompleted)return;
     final single=livestockResponse(wire);
     if(accepts(single)){result.complete(single);return;}
+    if(lsHex(single)==lsHex(request)){pending=[];return;}
     pending.addAll(wire);
     if(pending.length>512){pending=[];return;}
     final combined=livestockResponse(pending);
@@ -24,3 +25,4 @@ Future<List<int>> livestockExchange(BluetoothCharacteristic c, List<int> request
     return await result.future.timeout(timeout);
   } finally { await subscription.cancel(); }
 }
+

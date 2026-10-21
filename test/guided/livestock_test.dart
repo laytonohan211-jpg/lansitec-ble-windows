@@ -65,7 +65,8 @@ void main(){
     await tester.binding.setSurfaceSize(const Size(600,1000));addTearDown(()=>tester.binding.setSurfaceSize(null));
     final d=FakeDevice(),c=LivestockGatt();c.stored[6]=[120];
     await tester.pumpWidget(MaterialApp(home:LivestockSetupPage(device:d,services:[FakeService([c])])));
-    await tester.pumpAndSettle();
+    for(var i=0;i<50;i++) { await tester.pump(const Duration(milliseconds:100)); }
+    expect(find.byType(LinearProgressIndicator),findsNothing,reason:'Sent: ${c.sent.join(",")}');
     expect(c.sent.every((s)=>s.startsWith('B0')),isTrue);
     expect(c.sent,contains('B006'));expect(c.sent,contains('B030'));
     await tester.scrollUntilVisible(find.text('Heartbeat interval'),200,scrollable:find.byType(Scrollable).first);
@@ -89,3 +90,4 @@ void main(){
     expect(extraOperations('UWB Tracker'),isNot(contains('Position interval')));
   });
 }
+

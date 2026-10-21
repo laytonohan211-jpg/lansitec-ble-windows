@@ -17,6 +17,9 @@ class LivestockSetupPage extends StatefulWidget {
 class _LivestockSetupPageState extends State<LivestockSetupPage> {
   final values=<int,String>{};
   final history=<String>[];
+  final info=<String,String>{};
+  BluetoothCharacteristic? field(String id){final found=widget.services.expand((s)=>s.characteristics).where((c)=>shortUuid(c.uuid.str)==id).toList();return found.length==1?found.first:null;}
+  static const infoLabels={'ff81':'LoRaWAN region','ff82':'LoRaWAN sub-band','ff87':'Network status','2a19':'Battery','2a26':'Firmware version'};
   bool busy=false;
   String status='',geofence='',assetRule='';
   int generation=0;
@@ -28,7 +31,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
   }
   @override void initState(){
     super.initState();
-    link=widget.device?.connectionState.listen((s){if(!mounted)return;if(s==BluetoothConnectionState.disconnected){generation++;setState((){values.clear();geofence='';assetRule='';status='Disconnected';});}});
+    link=widget.device?.connectionState.listen((s){if(!mounted)return;if(s==BluetoothConnectionState.disconnected){generation++;setState((){values.clear();info.clear();geofence='';assetRule='';status='Disconnected';});}});
     WidgetsBinding.instance.addPostFrameCallback((_){if(mounted && connected)readAll();});
   }
   @override void dispose(){generation++;link?.cancel();super.dispose();}
@@ -46,6 +49,12 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
   Future<void> readAll() async {
     if(busy || !connected || command==null)return;
     setState((){busy=true;values.clear();status='Reading tracker…';});
+    final epoch=generation;
+    for(final id in infoLabels.keys){
+      final c=field(id);
+      if(c==null || !c.properties.read)continue;
+      try{final b=await c.read(timeout:3);if(!mounted || epoch!=generation)break;final text=id=='2a19' && b.length==1?'${b.first}%':utf8.decode(b).replaceAll(RegExp(r'\x00+$'),'').trim();setState(()=>info[id]=text);}catch(_){info.remove(id);}
+    }
     var failures=0,count=0;
     for(final p in livestockParameters){
       if(!mounted || !connected)break;
@@ -117,8 +126,32 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     });
   }
   Future<void> action(int id,String title) async {
-    if(!await approve('$title?','Livestock Tracker') || !mounted)return;
+    if(!await approve('$title?',id==4?'All tracker settings will be restored to factory defaults.':'Livestock Tracker') || !mounted)return;
     await perform(() async {if(widget.device==null){await copy([0xc0,id]);return;}await exchange([0xc0,id],0x6c,id,width:0);if(mounted)setState(()=>status='$title: confirmed');});
+  }
+  int get bandMaximum {
+    final region=(info['ff81']??'').toUpperCase();
+    if(region.contains('CN470'))return 12;
+    if(['US915','AU915','LA915'].any(region.contains))return 8;
+    return 0;
+  }
+  Future<void> editBand() async {
+    final controller=TextEditingController(text:info['ff82']??'AUTO');
+    final value=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(title:const Text('LoRaWAN sub-band'),content:TextField(controller:controller,decoration:InputDecoration(helperText:'AUTO or 1–$bandMaximum')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(ctx,controller.text),child:const Text('Apply'))]));
+    Future<void>.delayed(const Duration(milliseconds:400),controller.dispose);
+    if(value==null || !mounted)return;
+    await perform(()async{
+      final v=value.trim().toUpperCase(),n=int.tryParse(value.trim());
+      if(v!='AUTO' && (n==null || n<0 || n>bandMaximum))throw FormatException('Enter AUTO or 1–$bandMaximum');
+      final c=field('ff82');if(c==null || !connected)throw StateError('Connect to the tracker first.');
+      final epoch=generation;
+      await c.write(utf8.encode(v),withoutResponse:!c.properties.write,timeout:5);
+      info.remove('ff82');
+      final read=utf8.decode(await c.read(timeout:3)).replaceAll(RegExp(r'\x00+$'),'').trim().toUpperCase();
+      if(!mounted || epoch!=generation)return;
+      final same=read==v || (['AUTO','0'].contains(read) && ['AUTO','0'].contains(v));
+      setState((){info['ff82']=read;status=same?'Sub-band saved. Restart the tracker to apply.':'Device returned a different sub-band';});
+    });
   }
   Future<void> decode() async {
     final controller=TextEditingController();
@@ -132,13 +165,15 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     body:ListView(padding:const EdgeInsets.all(16),children:[
       if(busy)const LinearProgressIndicator(),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:SelectableText(status)),
+      for(final entry in info.entries)ListTile(title:Text(infoLabels[entry.key]!),subtitle:Text(entry.value),trailing:entry.key=='ff82' && bandMaximum>0?const Icon(Icons.edit):null,onTap:entry.key=='ff82' && bandMaximum>0 && !busy?editBand:null),
       for(final group in livestockParameters.map((p)=>p.group).toSet())...[
         Padding(padding:const EdgeInsets.only(top:20,bottom:8),child:Text(group,style:Theme.of(context).textTheme.titleLarge)),
         for(final p in livestockParameters.where((p)=>p.group==group))Card(child:ListTile(title:Text(p.name),subtitle:Text(values.containsKey(p.id)?p.display(values[p.id]!):'—'),trailing:const Icon(Icons.chevron_right),onTap:busy || (widget.device!=null && !connected)?null:()=>edit(p))),
       ],
       ListTile(title:const Text('Asset filter'),subtitle:Text(assetRule.isEmpty?'—':'Loaded'),trailing:const Icon(Icons.chevron_right),onTap:busy?null:()=>editSpecial(false)),
       ListTile(title:const Text('Geofence boundary'),subtitle:Text(geofence.isEmpty?'—':'${geofence.split('\n').length} points'),trailing:const Icon(Icons.chevron_right),onTap:busy?null:()=>editSpecial(true)),
-      for(final a in {1:'Request position',2:'Send registration',3:'Restart device'}.entries)OutlinedButton(onPressed:busy?null:()=>action(a.key,a.value),child:Text(a.value)),
+      for(final a in {1:'Request position',2:'Send registration',3:'Restart device',4:'Restore factory defaults'}.entries)OutlinedButton(onPressed:busy?null:()=>action(a.key,a.value),child:Text(a.value)),
       OutlinedButton(onPressed:decode,child:const Text('Decode LoRaWAN report')),
     ])));
 }
+
