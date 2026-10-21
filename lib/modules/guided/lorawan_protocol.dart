@@ -4,7 +4,8 @@ import 'device_profile.dart' show shortUuid;
 // Sources: user-supplied GATT ID for LoRaWAN Trackers.jpg; Container
 // Payload Specification 990-00121; Badge/Asset datasheet v5.35;
 // LoRaWAN Bluetooth Gateway Payload Specification, sections 4.2/4.3.
-enum LoRaModel { gateway, badge, container }
+enum LoRaModel { gateway, badge, asset, container, flex, label, helmet, livestock }
+LoRaModel loRaLayout(LoRaModel m) => [LoRaModel.asset, LoRaModel.flex, LoRaModel.label].contains(m) ? LoRaModel.badge : m;
 
 const loRaFields = {
   'ff81': 'Region', 'ff82': 'Band', 'ff83': 'Frequency (Hz)',
@@ -19,8 +20,13 @@ bool isLoRaGatt(Iterable<String> ids) =>
 
 String loRaModelLabel(LoRaModel model) => switch (model) {
   LoRaModel.gateway => 'LoRaWAN Bluetooth Gateway',
-  LoRaModel.badge => 'LoRaWAN Badge / Asset Tracker (v5.35)',
-  LoRaModel.container => 'LoRaWAN Container Tracker (990-00121)',
+  LoRaModel.badge => 'LoRaWAN Badge Tracker',
+  LoRaModel.asset => 'LoRaWAN Asset Management Tracker',
+  LoRaModel.flex => 'LoRaWAN Flex Tracker',
+  LoRaModel.label => 'LoRaWAN Tracking Label',
+  LoRaModel.helmet => 'LoRaWAN Helmet Sensor',
+  LoRaModel.livestock => 'LoRaWAN Livestock Tracker',
+  LoRaModel.container => 'LoRaWAN Container Tracker',
 };
 
 class LoRaParameter {
@@ -30,7 +36,10 @@ class LoRaParameter {
       {this.step = 1, this.min = 0});
 }
 
-List<LoRaParameter> loRaParameters(LoRaModel model) => [
+List<LoRaParameter> loRaParameters(LoRaModel input) {
+ final model=loRaLayout(input);
+ if(model==LoRaModel.livestock) return [];
+ return [
   LoRaParameter('heartbeat', 'Heartbeat (seconds)', '3600',
       model == LoRaModel.container ? 1966050 : 7650, step: 30, min: 30),
   LoRaParameter('ble', model == LoRaModel.gateway
@@ -42,10 +51,15 @@ List<LoRaParameter> loRaParameters(LoRaModel model) => [
     const LoRaParameter('gnssOn', 'GNSS enabled: 0 no, 1 yes', '1', 1),
     const LoRaParameter('bleOn', 'Bluetooth positioning enabled: 0 no, 1 yes', '1', 1),
   ],
-  if (model == LoRaModel.badge) ...[
+  if (model == LoRaModel.badge || model == LoRaModel.helmet) ...[
     const LoRaParameter('cfm', 'Confirm every N heartbeat messages', '2', 255),
     const LoRaParameter('missed', 'Missed acknowledgements before rejoin', '5', 255),
     const LoRaParameter('fall', 'Fall threshold (units of 0.5 m; 0 = off)', '4', 10),
+  ],
+  if (model == LoRaModel.helmet) ...[
+    const LoRaParameter('beacons', 'Maximum positioning beacons', '3', 15, min: 1),
+    const LoRaParameter('switch', 'Power switch enabled: 0 no, 1 yes', '1', 1),
+    const LoRaParameter('areaRssi', 'Special area signal threshold (magnitude)', '50', 255),
   ],
   if (model == LoRaModel.container) ...[
     const LoRaParameter('switch', 'Power switch enabled: 0 no, 1 yes', '1', 1),
@@ -53,8 +67,11 @@ List<LoRaParameter> loRaParameters(LoRaModel model) => [
     const LoRaParameter('motion', 'Motion threshold: (50 + value × 5) mg', '10', 255),
   ],
 ];
+}
 
-String loRaSettings(LoRaModel model, Map<String, String> fields) {
+String loRaSettings(LoRaModel input, Map<String, String> fields) {
+  final model=loRaLayout(input);
+  if(model==LoRaModel.livestock) throw const FormatException('Select an individual Livestock setting.');
   final n = <String, int>{};
   for (final p in loRaParameters(model)) {
     final v = int.tryParse(fields[p.key]?.trim() ?? '');
@@ -71,8 +88,11 @@ String loRaSettings(LoRaModel model, Map<String, String> fields) {
     throw const FormatException('Enable at least one positioning method.');
   }
   final header = 0x90 | (n['gnssOn']! << 3) | (n['mode']! << 1) |
-      n[model == LoRaModel.badge ? 'bleOn' : 'switch']!;
+      n[model == LoRaModel.container ? 'switch' : 'bleOn']!;
   final gnss = word(n['gnss']! ~/ 5);
+  if (model == LoRaModel.helmet) {
+    return '${byte(header)}${byte((n['beacons']! << 4) | (n['switch']! << 3))}${byte(n['areaRssi']!)}$ble$gnss${byte(hb)}${byte(n['cfm']!)}${byte(n['missed']!)}${byte(n['fall']!)}'.toUpperCase();
+  }
   if (model == LoRaModel.badge) {
     return '${byte(header)}$ble$gnss${byte(hb)}${byte(n['cfm']!)}${byte(n['missed']!)}${byte(n['fall']!)}'.toUpperCase();
   }
@@ -83,7 +103,7 @@ String loRaSettings(LoRaModel model, Map<String, String> fields) {
   return '${byte(header)}${word(hb)}$ble${byte(n['div']!)}${byte(n['bleOn']!)}$uuid${byte(n['motion']!)}$gnss'.toUpperCase();
 }
 
-String loRaReboot(LoRaModel model) => model == LoRaModel.gateway ? 'A30000' : 'A300';
+String loRaReboot(LoRaModel model) => model == LoRaModel.livestock ? 'C003' : model == LoRaModel.gateway ? 'A30000' : 'A300';
 
 // Configuration is an ASCII hexadecimal string carried as UTF-8, not binary.
 List<int> loRaWire(String command) => utf8.encode(command);

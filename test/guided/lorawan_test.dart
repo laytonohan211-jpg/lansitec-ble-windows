@@ -56,4 +56,3 @@ void main() {
     expect(payloadBytes(utf8.encode('600509')), [0x60, 0x05, 0x09]);
   });
 }
-

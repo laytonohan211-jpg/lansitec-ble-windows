@@ -1,3 +1,4 @@
+import 'livestock_setup_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -77,7 +78,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
       if (!mounted || epoch != generation) break;
       final c = entry.value;
       if (!c.properties.read || entry.key == 'ff85' || entry.key == 'ff86') {
-        values[entry.key] = 'Not read (command/log or no read permission)';
+        values[entry.key] = '—';
         continue;
       }
       String text;
@@ -85,14 +86,14 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         text = loRaReadValue(await c.read(timeout: 5));
         count++;
       } catch (e) {
-        text = 'Could not read. Check pairing / device configuration window.\n$e';
+        text = 'Read failed';
       }
       if (!mounted || epoch != generation) break;
       setState(() => values[entry.key] = text);
     }
     if (mounted) setState(() {
       busy = false;
-      if (epoch == generation) status = 'Read $count fields. Configuration readback may be a command echo, not current settings.';
+      if (epoch == generation) status = 'Read $count fields.';
     });
   }
 
@@ -113,7 +114,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
       title: Text(reboot ? 'Reboot device?' : 'Send complete configuration?'),
       content: SingleChildScrollView(child: Text(
-        '${loRaModelLabel(model!)}\n\n${reboot ? 'Bluetooth will disconnect.' : 'Every value below will be sent, including unchanged presets. These are NOT measured settings.\n\n${loRaParameters(model!).map((p) => '${p.label}: ${editors[p.key]!.text}').join('\n')}${editors.containsKey('uuid') ? '\nUUID: ${editors['uuid']!.text}' : ''}'}\n\nCommand: $command\n\nUse only with the selected model.')),
+        '${loRaModelLabel(model!)}\n\n${reboot ? 'Bluetooth will disconnect.' : 'Apply all the settings below?\n\n${loRaParameters(model!).map((p) => '${p.label}: ${editors[p.key]!.text}').join('\n')}${editors.containsKey('uuid') ? '\nUUID: ${editors['uuid']!.text}' : ''}'}\n\nCommand: $command\n\n')),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
@@ -126,7 +127,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     try {
       await c.write(loRaWire(command), withoutResponse: !c.properties.write, timeout: 8);
       if (mounted && epoch == generation) setState(() => status =
-        'Sent $command. Application by firmware is not verified.${reboot ? '' : ' Reboot if required by your device manual, then check the LoRaWAN server.'}');
+        reboot ? 'Restart requested' : 'Settings sent');
     } catch (e) {
       if (mounted) setState(() => status = 'Could not confirm delivery: $e');
     } finally {
@@ -136,6 +137,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
 
   @override
   Widget build(BuildContext context) {
+    if(model==LoRaModel.livestock) return LivestockSetupPage(device:widget.device,services:widget.services);
     final config = characteristics['ff84'];
     final canWrite = linked && !busy && config != null &&
         (config.properties.write || config.properties.writeWithoutResponse);
@@ -144,7 +146,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         IconButton(tooltip: 'Read current fields', onPressed: busy || !linked ? null : read, icon: const Icon(Icons.refresh)),
         IconButton(tooltip: 'Copy diagnostics', onPressed: () async {
           await Clipboard.setData(ClipboardData(text: [
-            'Ls BLE Guided 1.4.0 — LoRaWAN', widget.device.platformName,
+            'Ls BLE Guided 1.5.0 — LoRaWAN', widget.device.platformName,
             'Selected model: ${model?.name ?? 'none'}', status,
             for (final e in characteristics.entries)
               '${e.key} ${loRaFields[e.key]} read=${e.value.properties.read} write=${e.value.properties.write} withoutResponse=${e.value.properties.writeWithoutResponse}: ${values[e.key] ?? 'not read'}',
@@ -164,7 +166,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
           Card(child: ListTile(title: Text(loRaFields[e.key]!), subtitle: SelectableText(values[e.key] ?? 'Not read yet'))),
         const SizedBox(height: 16),
         const Text('Guided configuration', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        const Text('Select the exact device family. GATT identifiers are shared by several models and cannot identify the command format. Connect within the configuration window after power-on (typically 3 minutes; documented PIN: 116321).'),
+        const Text('Select your device.'),
         const SizedBox(height: 12),
         DropdownButtonFormField<LoRaModel>(
           value: model, isExpanded: true,
@@ -175,7 +177,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         ),
         if (model != null) ...[
           const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Text(
-            'Proposed values — NOT read from the device. Review all fields: sending replaces the complete tracking configuration. Radio band, frequency and keys are not changed.')),
+            'New configuration — review all values before applying.')),
           for (final p in loRaParameters(model!))
             Padding(padding: const EdgeInsets.only(bottom: 14), child: TextField(
               controller: editors[p.key], enabled: !busy,

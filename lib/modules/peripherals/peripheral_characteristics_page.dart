@@ -1,3 +1,4 @@
+import '../guided/livestock_setup_page.dart';
 import '../guided/lorawan_protocol.dart';
 import '../guided/lorawan_setup_page.dart';
 import '../guided/disconnect_guard.dart';
@@ -160,6 +161,7 @@ class _PeripheralCharacteristicsPageState
 
   @override
   Widget build(BuildContext context) {
+    if (_loRaGatt && '${widget.device.platformName} ${widget.device.advName}'.toLowerCase().contains('livestock')) return LivestockSetupPage(device:widget.device,services:_services);
     if (_loRaGatt) return LoRaSetupPage(key: ValueKey(_serviceGeneration), device: widget.device, services: _services);
     if (!_isBeacon && (_radio != null || _manualBeacon == false)) {
       return DeviceSetupPage(
@@ -187,7 +189,7 @@ class _PeripheralCharacteristicsPageState
                 tooltip: 'Copy device diagnostics',
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: [
-                    'Ls BLE Guided 1.4.0 — device profile',
+                    'Ls BLE Guided 1.5.0 — device profile',
                     'Name: ${widget.device.platformName}',
                     'Beacon profile: $_beaconGatt',
                     for (final s in _services)

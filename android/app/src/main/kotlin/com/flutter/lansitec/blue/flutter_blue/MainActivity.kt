@@ -34,7 +34,7 @@ class MainActivity: FlutterActivity() {
    if (call.method != "decode") { result.notImplemented(); return@setMethodCallHandler }
    val family = call.argument<String>("family") ?: ""
    val payload = call.argument<String>("payload") ?: ""
-   if (family !in listOf("container", "badge", "gateway") || payload.length !in 2..8192 || payload.length % 2 != 0 || !payload.matches(Regex("[0-9A-Fa-f]+"))) {
+   if (family !in listOf("container", "badge", "gateway", "livestock") || payload.length !in 2..8192 || payload.length % 2 != 0 || !payload.matches(Regex("[0-9A-Fa-f]+"))) {
     result.error("INVALID", "Invalid model or hexadecimal payload", null); return@setMethodCallHandler
    }
    try {
