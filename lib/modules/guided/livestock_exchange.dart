@@ -23,6 +23,7 @@ Future<List<int>> livestockExchange(BluetoothCharacteristic c, List<int> request
     if(!c.isNotifying && (c.properties.notify || c.properties.indicate)) await c.setNotifyValue(true,timeout:5);
     await c.write(utf8.encode(lsHex(request)), withoutResponse: !c.properties.write, timeout:5);
     return await result.future.timeout(timeout);
-  } finally { await subscription.cancel(); }
+  } finally { unawaited(subscription.cancel()); }
 }
+
 
