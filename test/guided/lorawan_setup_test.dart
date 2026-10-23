@@ -37,7 +37,8 @@ void main() {
     )));
     await tester.pumpAndSettle();
     expect(fields.every((c) => c.reads == 1 && c.sent.isEmpty), isTrue);
-    await tester.scrollUntilVisible(find.byType(TextField).first, 200);
+    await tester.scrollUntilVisible(find.byType(TextField).first, 200,
+      scrollable: find.byType(Scrollable).first);
     expect(tester.widgetList<TextField>(find.byType(TextField)).every((f) => f.controller!.text.isEmpty), isTrue);
     await tester.pumpWidget(const SizedBox());
     await device.changes.close();
