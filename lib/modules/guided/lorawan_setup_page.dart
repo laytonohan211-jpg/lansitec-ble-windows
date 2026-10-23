@@ -62,10 +62,10 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     editors.clear();
     if (next != null) {
       for (final p in loRaParameters(next)) {
-        editors[p.key] = TextEditingController(text: p.preset);
+        editors[p.key] = TextEditingController();
       }
       if (next == LoRaModel.container) {
-        editors['uuid'] = TextEditingController(text: 'F2A52D43E0AB489CB64C4A8300146720');
+        editors['uuid'] = TextEditingController();
       }
     }
     setState(() => model = next);

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_blue/modules/guided/lorawan_setup_page.dart';
+import 'package:flutter_blue/modules/guided/lorawan_protocol.dart';
 import 'feedback_test.dart' show FakeDevice, FakeService;
 
 class LoRaField extends BluetoothCharacteristic {
@@ -28,6 +29,19 @@ class LoRaField extends BluetoothCharacteristic {
 }
 
 void main() {
+  testWidgets('Selected LoRa model reads automatically without inventing current settings', (tester) async {
+    final device = FakeDevice();
+    final fields = [LoRaField('ff81'), LoRaField('ff82'), LoRaField('ff84')];
+    await tester.pumpWidget(MaterialApp(home: LoRaSetupPage(
+      device: device, services: [FakeService(fields)], initialModel: LoRaModel.gateway,
+    )));
+    await tester.pumpAndSettle();
+    expect(fields.every((c) => c.reads == 1 && c.sent.isEmpty), isTrue);
+    await tester.scrollUntilVisible(find.byType(TextField).first, 200);
+    expect(tester.widgetList<TextField>(find.byType(TextField)).every((f) => f.controller!.text.isEmpty), isTrue);
+    await tester.pumpWidget(const SizedBox());
+    await device.changes.close();
+  });
   testWidgets('Initial LoRa read continues after failure and never writes commands', (tester) async {
     final device = FakeDevice();
     final fields = [
@@ -48,4 +62,3 @@ void main() {
     await device.changes.close();
   });
 }
-
