@@ -30,6 +30,8 @@ class LoRaField extends BluetoothCharacteristic {
 
 void main() {
   testWidgets('Selected LoRa model reads automatically without inventing current settings', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(600, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     final device = FakeDevice();
     final fields = [LoRaField('ff81'), LoRaField('ff82'), LoRaField('ff84')];
     await tester.pumpWidget(MaterialApp(home: LoRaSetupPage(
@@ -37,8 +39,7 @@ void main() {
     )));
     await tester.pumpAndSettle();
     expect(fields.every((c) => c.reads == 1 && c.sent.isEmpty), isTrue);
-    await tester.scrollUntilVisible(find.byType(TextField).first, 200,
-      scrollable: find.byType(Scrollable).first);
+    expect(find.byType(TextField), findsNWidgets(2));
     expect(tester.widgetList<TextField>(find.byType(TextField)).every((f) => f.controller!.text.isEmpty), isTrue);
     await tester.pumpWidget(const SizedBox());
     await device.changes.close();
