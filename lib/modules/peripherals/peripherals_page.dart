@@ -1,4 +1,3 @@
-import '../guided/lora_catalog_page.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../utils/stable_scan_stream.dart';
@@ -74,7 +73,6 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
               }).toList();
           return Column(
             children: [
-              Align(alignment:Alignment.centerRight, child:TextButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>const LoRaCatalogPage())),icon:const Icon(Icons.cell_tower),label:const Text('LoRaWAN tools'))),
               // 上半部分：扫描到的设备 + 输入框
               Padding(
                 padding: const EdgeInsets.all(15.0),

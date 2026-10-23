@@ -1,3 +1,4 @@
+import '../guided/profile_selection.dart';
 import '../guided/livestock_setup_page.dart';
 import '../guided/lorawan_protocol.dart';
 import '../guided/lorawan_setup_page.dart';
@@ -55,6 +56,8 @@ class _PeripheralCharacteristicsPageState
   bool _disconnectTriggeredOnExit = false;
   bool _hasRequestedMtu = false;
   bool? _manualBeacon;
+  DeviceConnectivity? _selectedType;
+  String? _selectedModel;
   bool _pairing = false;
   String _pairingStatus = '';
   bool _discovering = false;
@@ -161,15 +164,38 @@ class _PeripheralCharacteristicsPageState
 
   @override
   Widget build(BuildContext context) {
-    if (_loRaGatt && '${widget.device.platformName} ${widget.device.advName}'.toLowerCase().contains('livestock')) return LivestockSetupPage(device:widget.device,services:_services);
-    if (_loRaGatt) return LoRaSetupPage(key: ValueKey(_serviceGeneration), device: widget.device, services: _services);
-    if (!_isBeacon && (_radio != null || _manualBeacon == false)) {
+    final name = '${widget.device.platformName} ${widget.device.advName}'.trim();
+    if (_selectedType == null) {
+      final type = _loRaGatt ? DeviceConnectivity.lora
+          : _radio == RadioFamily.cat1 ? DeviceConnectivity.cat1
+          : _radio == RadioFamily.nb ? DeviceConnectivity.nb
+          : _isBeacon ? DeviceConnectivity.beacon : null;
+      final lora = detectLoRaModel(name);
+      final model = type == DeviceConnectivity.lora
+          ? (lora == null ? null : loRaModelLabel(lora))
+          : type == DeviceConnectivity.beacon ? detectBeaconModel(name)
+          : detectModel(name, _radio);
+      return ProfileSelection(
+        key: ValueKey(_serviceGeneration), deviceName: name,
+        initialType: type, initialModel: model,
+        connected: widget.device.isConnected,
+        onSelected: (type, model) => setState(() {
+          _selectedType = type; _selectedModel = model;
+          _manualBeacon = type == DeviceConnectivity.beacon;
+        }),
+      );
+    }
+    if (_selectedType == DeviceConnectivity.lora) {
+      final model = LoRaModel.values.firstWhere((m) => loRaModelLabel(m) == _selectedModel);
+      if (model == LoRaModel.livestock) return LivestockSetupPage(device: widget.device, services: _services);
+      return LoRaSetupPage(key: ValueKey(_serviceGeneration), device: widget.device,
+        services: _services, initialModel: model);
+    }
+    if (_selectedType != DeviceConnectivity.beacon) {
       return DeviceSetupPage(
-        device: widget.device,
-        services: _services,
-        descriptions: _descCache,
-        radioFamily: _radio,
-        initialModel: detectModel(widget.device.platformName, _radio),
+        device: widget.device, services: _services, descriptions: _descCache,
+        radioFamily: _selectedType == DeviceConnectivity.cat1 ? RadioFamily.cat1 : RadioFamily.nb,
+        initialModel: _selectedModel,
       );
     }
     return DisconnectGuard(
@@ -178,7 +204,7 @@ class _PeripheralCharacteristicsPageState
         value: _characteristicBloc,
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Beacon setup'),
+            title: Text(_selectedModel ?? 'Beacon setup'),
             actions: [
               IconButton(
                 tooltip: 'Refresh device profile',
@@ -189,7 +215,7 @@ class _PeripheralCharacteristicsPageState
                 tooltip: 'Copy device diagnostics',
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: [
-                    'Ls BLE Guided 1.5.0 — device profile',
+                    'Ls BLE Guided 1.5.1 — device profile',
                     'Name: ${widget.device.platformName}',
                     'Beacon profile: $_beaconGatt',
                     for (final s in _services)
@@ -259,9 +285,7 @@ class _PeripheralCharacteristicsPageState
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: BeaconGuide(
-                          initialModel: detectBeaconModel(
-                            widget.device.platformName,
-                          ),
+                          initialModel: _selectedModel,
                         ),
                       ),
                     ],

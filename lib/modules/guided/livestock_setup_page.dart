@@ -161,7 +161,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     try{final payload=lsHex(lsBytes(raw));final decoded=await const MethodChannel('lansitec/decoder').invokeMethod<String>('decode',{'family':'livestock','payload':payload});if(!mounted)return;await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Livestock report'),content:SingleChildScrollView(child:SelectableText(const JsonEncoder.withIndent('  ').convert(jsonDecode(decoded??'{}')))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));}catch(e){if(mounted)setState(()=>status='Could not decode report: $e');}
   }
   @override Widget build(BuildContext context)=>DisconnectGuard(connected:connected,busy:busy,child:Scaffold(
-    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.5.0',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
+    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.5.1',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       if(busy)const LinearProgressIndicator(),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:SelectableText(status)),
@@ -176,4 +176,3 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
       OutlinedButton(onPressed:decode,child:const Text('Decode LoRaWAN report')),
     ])));
 }
-

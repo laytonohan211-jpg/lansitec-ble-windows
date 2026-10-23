@@ -44,6 +44,6 @@ jobs:
         run: |
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-release.apk dist/UNSIGNED-app.apk
-          (cd dist && sha256sum UNSIGNED-app.apk > SHA256SUMS && zip Android-1.5.0-unsigned-build.zip UNSIGNED-app.apk SHA256SUMS)
-          TAG=android-1.5.0-build.${{ github.run_number }}
-          gh release create "$TAG" dist/Android-1.5.0-unsigned-build.zip --target "$GITHUB_SHA" --prerelease --title "Android 1.5.0 build ${{ github.run_number }} — unsigned intermediate" --notes "Build intermediate only. This unsigned APK requires local signing with the existing app key before installation."
+          (cd dist && sha256sum UNSIGNED-app.apk > SHA256SUMS && zip Android-1.5.1-unsigned-build.zip UNSIGNED-app.apk SHA256SUMS)
+          TAG=android-1.5.1-build.${{ github.run_number }}
+          gh release create "$TAG" dist/Android-1.5.1-unsigned-build.zip --target "$GITHUB_SHA" --prerelease --title "Android 1.5.1 build ${{ github.run_number }} — unsigned intermediate" --notes "Build intermediate only. This unsigned APK requires local signing with the existing app key before installation."

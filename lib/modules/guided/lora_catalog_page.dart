@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'lorawan_protocol.dart';
 import 'livestock_protocol.dart';
-import 'livestock_setup_page.dart';
 
-const extraLoRaModels=['UWB Tracker','UWB Anchor','PT100 Sensor','Temperature / Humidity Sensor','Rotary Valve Sensor','Contact Tracing Badge','Trusstor Asset Tracker'];
+const extraLoRaModels=['UWB Tracker','UWB Anchor','PT100 Sensor','Temperature / Humidity Sensor','Rotary Valve Sensor','Contact Tracing Badge'];
 List<LoRaParameter> extraParameters(String model,String operation) {
   if(model.startsWith('UWB')) {
     if(operation=='Heartbeat')return [const LoRaParameter('value','Heartbeat (seconds)','3600',1966050,min:30,step:30)];
@@ -17,27 +16,17 @@ List<LoRaParameter> extraParameters(String model,String operation) {
     return [];
   }
   if(model.contains('PT100') || model.startsWith('Temperature'))return operation=='Report interval'?[const LoRaParameter('value','Report interval (seconds)','600',655350,min:10,step:10)]:[];
-  if(model=='Trusstor Asset Tracker' && operation=='Tracking configuration')return [
-    const LoRaParameter('ble','Position interval (seconds)','300',327675,step:5),
-    const LoRaParameter('heartbeat','Heartbeat (seconds)','3600',7650,min:30,step:30),
-    const LoRaParameter('mode','0: periodic, 1: autonomous, 2: on demand','1',2),
-    const LoRaParameter('gnss','GNSS enabled: 0 no, 1 yes','0',1),
-    const LoRaParameter('cfm','Confirm every N heartbeats','2',255),
-    const LoRaParameter('missed','Missed acknowledgements','5',255),
-    const LoRaParameter('fall','Fall threshold (units of 0.5 m)','4',10),
-    const LoRaParameter('motion','Motion threshold (mg)','45',255,min:1),
-  ];
   return [];
 }
 List<String> extraOperations(String model)=>[
   if(model.startsWith('UWB'))...['Heartbeat','Confirm every N heartbeats','Missed acknowledgements','Clock sync interval','Clock sync spreading factor','Clock sync bandwidth',if(model=='UWB Anchor')'Advertising interval',if(model=='UWB Tracker')'Fall threshold','Read configuration'],
   if(model.contains('PT100')||model.startsWith('Temperature'))'Report interval',
-  if(model=='Trusstor Asset Tracker')'Tracking configuration',
   'Request registration','Restart',
   if(model=='Contact Tracing Badge')...['Start continuous scanning','Stop continuous scanning'],
-  if(model=='UWB Tracker' || model=='Trusstor Asset Tracker')'Request position',
+  if(model=='UWB Tracker')'Request position',
 ];
 String extraCommand(String model,String operation,Map<String,String> fields,int messageId){
+  if (!extraLoRaModels.contains(model)) throw const FormatException('Unknown device');
   final params=extraParameters(model,operation),n=<String,int>{};
   for(final p in params){final v=int.tryParse(fields[p.key]??'');if(v==null || v<p.min || v>p.max || v%p.step!=0)throw FormatException('${p.label}: ${p.min}–${p.max}, step ${p.step}');n[p.key]=v~/p.step;}
   String hex(int x,int width)=>x.toRadixString(16).padLeft(width*2,'0').toUpperCase();
@@ -53,7 +42,6 @@ String extraCommand(String model,String operation,Map<String,String> fields,int 
     if(messageId>255)throw const FormatException('Message ID: 1–255');
     return '${operation=='Restart'?'A2':'A1'}${hex(messageId,1)}';
   }
-  if(model=='Trusstor Asset Tracker'&&operation=='Tracking configuration')return '${hex(0x90|(n['gnss']!<<3)|(n['mode']!<<1),1)}${hex(n['ble']!,2)}${hex(n['heartbeat']!,1)}${hex(n['cfm']!,1)}${hex(n['missed']!,1)}${hex(n['fall']!,1)}${hex(n['motion']!,1)}';
   if(model=='Contact Tracing Badge'){
     if(messageId>255)throw const FormatException('Message ID: 1–255');
     final id=operation=='Restart'?3:operation=='Start continuous scanning'?5:operation=='Stop continuous scanning'?4:2;
@@ -62,13 +50,6 @@ String extraCommand(String model,String operation,Map<String,String> fields,int 
   return operation=='Restart'?'A300':operation=='Request position'?'A100':'A200';
 }
 
-class LoRaCatalogPage extends StatelessWidget {
-  const LoRaCatalogPage({super.key});
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('LoRaWAN tools')),body:ListView(children:[
-    for(final m in LoRaModel.values)ListTile(title:Text(loRaModelLabel(m)),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>m==LoRaModel.livestock?const LivestockSetupPage():LoRaCommandPage(model:m)))),
-    for(final m in extraLoRaModels)ListTile(title:Text(m),trailing:const Icon(Icons.chevron_right),onTap:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>LoRaCommandPage(extra:m)))),
-  ]));
-}
 class LoRaCommandPage extends StatefulWidget {
   final LoRaModel? model;final String? extra;
   const LoRaCommandPage({super.key,this.model,this.extra});

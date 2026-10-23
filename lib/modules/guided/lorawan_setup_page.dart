@@ -10,7 +10,8 @@ import 'lorawan_protocol.dart';
 class LoRaSetupPage extends StatefulWidget {
   final BluetoothDevice device;
   final List<BluetoothService> services;
-  const LoRaSetupPage({super.key, required this.device, required this.services});
+  final LoRaModel? initialModel;
+  const LoRaSetupPage({super.key, required this.device, required this.services, this.initialModel});
   @override
   State<LoRaSetupPage> createState() => _LoRaSetupPageState();
 }
@@ -33,6 +34,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
   void initState() {
     super.initState();
     linked = widget.device.isConnected;
+    if (widget.initialModel != null) choose(widget.initialModel);
     connection = widget.device.connectionState.listen((s) {
       if (!mounted) return;
       setState(() {
@@ -127,7 +129,9 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     try {
       await c.write(loRaWire(command), withoutResponse: !c.properties.write, timeout: 8);
       if (mounted && epoch == generation) setState(() => status =
-        reboot ? 'Restart requested' : 'Settings sent');
+        reboot ? 'Restart requested' : c.properties.write
+          ? 'Received via Bluetooth. Settings not yet verified.'
+          : 'Sent. Device confirmation not received.');
     } catch (e) {
       if (mounted) setState(() => status = 'Could not confirm delivery: $e');
     } finally {
@@ -146,7 +150,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         IconButton(tooltip: 'Read current fields', onPressed: busy || !linked ? null : read, icon: const Icon(Icons.refresh)),
         IconButton(tooltip: 'Copy diagnostics', onPressed: () async {
           await Clipboard.setData(ClipboardData(text: [
-            'Ls BLE Guided 1.5.0 — LoRaWAN', widget.device.platformName,
+            'Ls BLE Guided 1.5.1 — LoRaWAN', widget.device.platformName,
             'Selected model: ${model?.name ?? 'none'}', status,
             for (final e in characteristics.entries)
               '${e.key} ${loRaFields[e.key]} read=${e.value.properties.read} write=${e.value.properties.write} withoutResponse=${e.value.properties.writeWithoutResponse}: ${values[e.key] ?? 'not read'}',
