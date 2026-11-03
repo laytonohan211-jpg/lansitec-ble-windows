@@ -44,4 +44,6 @@ Release evidence: Windows code commit 108f9435a9e9f37dba9d09184f0321bca66d1d07; 
 - Suspend scans for the entire connection/configuration route and reject duplicate Connect attempts. Release suspension on return, cancellation or error; scanning remains available from the list.
 - Correction to diagnosis: Connect already stopped the devices-page scan. New guard prevents competing/background scan starts during a session.
 - Android: no native WinRT patch applicable. Scan-session guard is a pending shared improvement to assess/port on the next Android update. Existing Android build unchanged.
-- Build pending. Realtek and physical-device idle stability require user testing; this is a targeted mitigation, not a confirmed hardware fix.
+- Build passed: 75 Flutter tests, 5 decoder vectors, native WinRT compilation, installer and application launch checks. Realtek and physical-device idle stability require user testing; this is a targeted mitigation, not a confirmed hardware fix.
+
+Windows 1.5.4 evidence: code commit e910def551f29f2fe1d560a54543ead625744062; workflow 41619823390; release windows-1.5.4-build.7. Installer SHA256 9e3fab81c917fac660b0c771dea11e36499e85077b54d322bb95bf3fdd081a21. Build log confirms WinRT retention patch applied. No automatic configuration replay.
