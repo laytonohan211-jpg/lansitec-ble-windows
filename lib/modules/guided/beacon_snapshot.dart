@@ -278,7 +278,7 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
         TextButton.icon(
           onPressed: () async {
             final report = [
-              'Ls BLE Guided 1.5.3 — beacon',
+              'Ls BLE Guided 1.5.4 — beacon',
               'Name: ${widget.device.platformName}',
               for (final s in widget.services)
                 'Service ${s.uuid.str}: ${s.characteristics.map((c) => '${c.uuid.str} read=${c.properties.read} write=${c.properties.write || c.properties.writeWithoutResponse}').join(', ')}',
