@@ -33,6 +33,8 @@ jobs:
         run: |
           flutter test test/guided --timeout 60s
           if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+          node test/guided/livestock_decoder_test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Livestock decoder tests failed' }
       - name: Compile Windows application
         timeout-minutes: 20
         shell: pwsh
@@ -76,6 +78,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "windows-1.5.2-build.${{ github.run_number }}"
-          gh release create $tag dist/Ls_BLE_Guided_Windows_Setup.exe dist/Ls_BLE_Guided_Windows_x64.zip --target '${{ github.sha }}' --title "Ls BLE Guided Windows 1.5.2 (build ${{ github.run_number }})" --notes "Scarica Ls_BLE_Guided_Windows_Setup.exe e aprilo per installare l'app. Include le librerie necessarie. Compilazione, test automatici e avvio verificati su Windows. Il collegamento BLE con adattatore Realtek e dispositivi fisici deve essere verificato sul PC. Installer non firmato digitalmente. In alternativa e disponibile lo ZIP portatile."
+          $tag = "windows-1.5.3-build.${{ github.run_number }}"
+          gh release create $tag dist/Ls_BLE_Guided_Windows_Setup.exe dist/Ls_BLE_Guided_Windows_x64.zip --target '${{ github.sha }}' --title "Ls BLE Guided Windows 1.5.3 (build ${{ github.run_number }})" --notes "Scarica Ls_BLE_Guided_Windows_Setup.exe e aprilo per installare l'app. Include le librerie necessarie. Compilazione, test automatici e avvio verificati su Windows. Il collegamento BLE con adattatore Realtek e dispositivi fisici deve essere verificato sul PC. Installer non firmato digitalmente. In alternativa e disponibile lo ZIP portatile."
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

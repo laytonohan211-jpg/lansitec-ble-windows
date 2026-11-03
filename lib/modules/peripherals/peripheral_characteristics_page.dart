@@ -1,3 +1,7 @@
+import '../guided/profile_selection.dart';
+import '../guided/livestock_setup_page.dart';
+import '../guided/lorawan_protocol.dart';
+import '../guided/lorawan_setup_page.dart';
 import '../guided/disconnect_guard.dart';
 import '../guided/beacon_snapshot.dart';
 import 'dart:async';
@@ -52,6 +56,8 @@ class _PeripheralCharacteristicsPageState
   bool _disconnectTriggeredOnExit = false;
   bool _hasRequestedMtu = false;
   bool? _manualBeacon;
+  DeviceConnectivity? _selectedType;
+  String? _selectedModel;
   bool _pairing = false;
   String _pairingStatus = '';
   bool _discovering = false;
@@ -63,6 +69,7 @@ class _PeripheralCharacteristicsPageState
         .where((s) => shortUuid(s.uuid.str) == 'fff0')
         .expand((s) => s.characteristics.map((c) => c.uuid.str)),
   );
+  bool get _loRaGatt => _services.any((s) => isLoRaGatt(s.characteristics.map((c) => c.uuid.str)));
   bool get _beaconGatt => detectBeaconGatt(
     _services.map((s) => s.uuid.str),
     _services
@@ -112,7 +119,7 @@ class _PeripheralCharacteristicsPageState
     }
     // Known GATT profiles already supply labels. Do not compete with the
     // initial parameter read by fetching every descriptor in the background.
-    if (!_beaconGatt && _radio == null) {
+    if (!_loRaGatt && !_beaconGatt && _radio == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _refreshProfile());
     }
 
@@ -157,13 +164,38 @@ class _PeripheralCharacteristicsPageState
 
   @override
   Widget build(BuildContext context) {
-    if (!_isBeacon && (_radio != null || _manualBeacon == false)) {
+    final name = '${widget.device.platformName} ${widget.device.advName}'.trim();
+    if (_selectedType == null) {
+      final type = _loRaGatt ? DeviceConnectivity.lora
+          : _radio == RadioFamily.cat1 ? DeviceConnectivity.cat1
+          : _radio == RadioFamily.nb ? DeviceConnectivity.nb
+          : _isBeacon ? DeviceConnectivity.beacon : null;
+      final lora = detectLoRaModel(name);
+      final model = type == DeviceConnectivity.lora
+          ? (lora == null ? null : loRaModelLabel(lora))
+          : type == DeviceConnectivity.beacon ? detectBeaconModel(name)
+          : detectModel(name, _radio);
+      return ProfileSelection(
+        key: ValueKey(_serviceGeneration), deviceName: name,
+        initialType: type, initialModel: model,
+        connected: widget.device.isConnected,
+        onSelected: (type, model) => setState(() {
+          _selectedType = type; _selectedModel = model;
+          _manualBeacon = type == DeviceConnectivity.beacon;
+        }),
+      );
+    }
+    if (_selectedType == DeviceConnectivity.lora) {
+      final model = LoRaModel.values.firstWhere((m) => loRaModelLabel(m) == _selectedModel);
+      if (model == LoRaModel.livestock) return LivestockSetupPage(device: widget.device, services: _services);
+      return LoRaSetupPage(key: ValueKey(_serviceGeneration), device: widget.device,
+        services: _services, initialModel: model);
+    }
+    if (_selectedType != DeviceConnectivity.beacon) {
       return DeviceSetupPage(
-        device: widget.device,
-        services: _services,
-        descriptions: _descCache,
-        radioFamily: _radio,
-        initialModel: detectModel(widget.device.platformName, _radio),
+        device: widget.device, services: _services, descriptions: _descCache,
+        radioFamily: _selectedType == DeviceConnectivity.cat1 ? RadioFamily.cat1 : RadioFamily.nb,
+        initialModel: _selectedModel,
       );
     }
     return DisconnectGuard(
@@ -172,7 +204,7 @@ class _PeripheralCharacteristicsPageState
         value: _characteristicBloc,
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Beacon setup'),
+            title: Text(_selectedModel ?? 'Beacon setup'),
             actions: [
               IconButton(
                 tooltip: 'Refresh device profile',
@@ -183,7 +215,7 @@ class _PeripheralCharacteristicsPageState
                 tooltip: 'Copy device diagnostics',
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: [
-                    'Ls BLE Guided 1.3.4 — device profile',
+                    'Ls BLE Guided 1.5.3 — device profile',
                     'Name: ${widget.device.platformName}',
                     'Beacon profile: $_beaconGatt',
                     for (final s in _services)
@@ -253,9 +285,7 @@ class _PeripheralCharacteristicsPageState
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: BeaconGuide(
-                          initialModel: detectBeaconModel(
-                            widget.device.platformName,
-                          ),
+                          initialModel: _selectedModel,
                         ),
                       ),
                     ],

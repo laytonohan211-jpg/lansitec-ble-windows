@@ -5,7 +5,7 @@ import 'package:flutter_js/flutter_js.dart';
 
 /// Uses the same bundled Lansitec decoders on Android and Windows.
 Future<String> decodeUplink(String family, String payload) async {
-  if (!{'container', 'badge', 'gateway'}.contains(family) ||
+  if (!{'container', 'badge', 'gateway', 'livestock'}.contains(family) ||
       payload.isEmpty ||
       payload.length > 8192 ||
       payload.length.isOdd ||
