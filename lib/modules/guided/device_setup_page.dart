@@ -644,6 +644,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                 );
               if (s == 'read') run(() => readCurrentSettings());
               if (s == 'diagnostics') diagnostics();
+              if (s == 'json') exportJson();
               if (s == 'disconnect') Navigator.of(context).maybePop();
             },
             itemBuilder:
@@ -661,6 +662,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                       value: 'pair',
                       child: Text('Pair device'),
                     ),
+                  const PopupMenuItem(value: 'json', child: Text('Export configuration JSON')),
                   const PopupMenuItem(
                     value: 'read',
                     child: Text('Read current settings'),
@@ -1426,6 +1428,36 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
           : '$total ${total == 1 ? 'change' : 'changes'} verified.',
       color: reported > 0 ? Colors.blue : Colors.green.shade700,
     );
+  }
+
+  Future<void> exportJson() async {
+    final data = <String, dynamic>{
+      'schemaVersion': 1, 'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      'device': {'name': deviceTitle, 'bluetoothId': widget.device.remoteId.str,
+        'model': model, 'connectivity': family?.name, 'connected': connected},
+      'network': Map<String,String>.from(networkCurrent),
+      'tracking': [if (model != null) for (final p in parameters(model!)) {
+        'id': p.id, 'name': settingName(p), 'raw': current[p.id],
+        'value': current[p.id] == null ? null : valueLabel(p, current[p.id]!),
+        'read': current.containsKey(p.id),
+      }],
+      'snapshotStatus': snapshotStatus,
+    };
+    final json = const JsonEncoder.withIndent('  ').convert(data);
+    if (!mounted) return;
+    await showDialog<void>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Export configuration JSON'),
+      content: SizedBox(width: 550, child: SingleChildScrollView(child: Column(
+        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+        children: [const Text('Contains the last read settings, including network credentials. Share only with trusted support.'),
+          const SizedBox(height: 12), SelectableText(json)],
+      ))),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        FilledButton(onPressed: () async { await Clipboard.setData(ClipboardData(text: json));
+          if (ctx.mounted) Navigator.pop(ctx);
+          if (mounted) message('Configuration JSON copied');
+        }, child: const Text('Copy JSON'))],
+    ));
   }
 
   Future<void> diagnostics() async {
