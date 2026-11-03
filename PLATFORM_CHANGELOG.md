@@ -47,3 +47,19 @@ Release evidence: Windows code commit 108f9435a9e9f37dba9d09184f0321bca66d1d07; 
 - Build passed: 75 Flutter tests, 5 decoder vectors, native WinRT compilation, installer and application launch checks. Realtek and physical-device idle stability require user testing; this is a targeted mitigation, not a confirmed hardware fix.
 
 Windows 1.5.4 evidence: code commit e910def551f29f2fe1d560a54543ead625744062; workflow 41619823390; release windows-1.5.4-build.7. Installer SHA256 9e3fab81c917fac660b0c771dea11e36499e85077b54d322bb95bf3fdd081a21. Build log confirms WinRT retention patch applied. No automatic configuration replay.
+
+## Field regression report — Windows 1.5.4 (2026-11-03)
+- User reports worse discovery/connection and a drop DURING Livestock parameter reads, not idle after success. Do not describe 1.5.4 as a verified stability fix.
+- Capture: valid responses B001 through B011 (15 queried IDs, non-contiguous). First failure B012: writeCharacteristic Unknown error; B013 then reports disconnected. B012 is documented uint16 inactivity minutes, so do not label it invalid or remove it without firmware evidence.
+- Root cause unresolved: need same-device Android comparison and timestamps/native Windows HRESULT. Current native catch-all suppresses WinRT error details; current reader continues after transport failure until disconnect event/three failures.
+- Next diagnostic change should stop a snapshot on the first transport error, record timestamp/model/firmware/native HRESULT, and compare against pre-1.5.4 retention behavior. Avoid blind command retries, configuration writes or claiming a fix from CI alone. Scan suspension on return also needs recovery review.
+- User asked whether Android succeeds on this same tracker; answer pending.
+
+## Windows 1.5.5 — Livestock regression follow-up (2026-11-03)
+- Same tracker reads completely on Android (confirmed by user). Windows-specific investigation; this does not prove which native/driver operation is faulty.
+- Roll back 1.5.4 MaintainConnection/session injection, including previously modified dependency caches. Keep explicit scan hold; resume device scanning after returning/failing once disconnected.
+- Space Livestock commands by at least 200 ms after the previous exchange. Abort automatic snapshot on FIRST exchange error, without sending subsequent queries or retrying writes.
+- Diagnostics include relative timestamps, selected device, firmware/region info when read, link loss, and the original Windows HRESULT for failed native writes instead of catch-all Unknown error.
+- Added regression: failure at B012 must not send B013 or special queries. Existing automatic read/write/readback tests retained.
+- Android unchanged: currently working. Shared error-stop/diagnostic improvements pending assessment for next Android release. Windows-specific delay/WinRT rollback not automatically copied.
+- Build pending; require real device confirmation before claiming stability fixed.

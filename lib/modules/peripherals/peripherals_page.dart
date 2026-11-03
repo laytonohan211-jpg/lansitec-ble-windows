@@ -341,7 +341,13 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
       debugPrint("Connect Error ${device.advName}: $e");
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connection failed: $e')));
     } finally {
-      if (scanHeld) BleScanCoordinator.instance.releaseConnectionHold();
+      if (scanHeld) {
+        BleScanCoordinator.instance.releaseConnectionHold();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (mounted && !device.isConnected) {
+          try { await BleScanCoordinator.instance.start(BleScanCoordinator.devicesOwner); } catch (_) {}
+        }
+      }
       _openingDevice = false;
     }
   }

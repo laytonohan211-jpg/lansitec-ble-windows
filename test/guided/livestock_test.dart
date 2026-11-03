@@ -16,12 +16,14 @@ class LivestockGatt extends BluetoothCharacteristic {
   final sent=<String>[];
   final stored=<int,List<int>>{for(final p in livestockParameters)p.id:p.width==16?List.filled(16,0):p.encode('${p.min*p.step}')};
   bool silent=false;
+  int? failId;
   @override CharacteristicProperties get properties=>const CharacteristicProperties(write:true,notify:true);
   @override bool get isNotifying=>true;
   @override Stream<List<int>> get onValueReceived=>stream.stream;
   @override Future<void> write(List<int> bytes,{bool withoutResponse=false,bool allowLongWrite=false,int timeout=15}) async {
     final text=utf8.decode(bytes);sent.add(text);if(silent)return;
     final b=lsBytes(text),id=b[1];
+    if(id==failId)throw StateError("simulated Windows transport failure");
     if(b[0]==0xa0){stored[id]=b.sublist(2);stream.add(utf8.encode('6A${lsHex([id])}'));}
     else if(b[0]==0xb0){final v=id==12?lsBytes('1203000502001E'):id==48?[0]:stored[id]!;stream.add(utf8.encode(lsHex([0x6b,id,...v])));}
   }
@@ -65,7 +67,7 @@ void main(){
     await tester.binding.setSurfaceSize(const Size(600,1000));addTearDown(()=>tester.binding.setSurfaceSize(null));
     final d=FakeDevice(),c=LivestockGatt();c.stored[6]=[120];
     await tester.pumpWidget(MaterialApp(home:LivestockSetupPage(device:d,services:[FakeService([c])])));
-    for(var i=0;i<50;i++) { await tester.pump(const Duration(milliseconds:100)); }
+    for(var i=0;i<100;i++) { await tester.pump(const Duration(milliseconds:100)); }
     expect(find.byType(LinearProgressIndicator),findsNothing,reason:'Sent: ${c.sent.join(",")}');
     expect(c.sent.every((s)=>s.startsWith('B0')),isTrue);
     expect(c.sent,contains('B006'));expect(c.sent,contains('B030'));
@@ -76,6 +78,16 @@ void main(){
     expect(c.sent.where((s)=>s.startsWith('A0')),['A00614']);
     expect(c.sent.last,'B006');expect(find.text('600 s'),findsOneWidget);
     await tester.pumpWidget(const SizedBox());await tester.pump(const Duration(seconds:1));await d.changes.close();await c.stream.close();
+  });
+  testWidgets('First transport failure stops the snapshot without sending later queries',(tester)async{
+    final d=FakeDevice(),c=LivestockGatt()..failId=18;
+    await tester.pumpWidget(MaterialApp(home:LivestockSetupPage(device:d,services:[FakeService([c])])));
+    for(var i=0;i<100;i++) { await tester.pump(const Duration(milliseconds:100)); }
+    expect(c.sent.last,'B012');
+    expect(c.sent, isNot(contains('B013')));
+    expect(c.sent, isNot(contains('B030')));
+    expect(find.textContaining('Reading stopped'),findsOneWidget);
+    await tester.pumpWidget(const SizedBox());await d.changes.close();await c.stream.close();
   });
   test('Additional model layouts and downlinks use their own formats',(){
     for(final m in [LoRaModel.asset,LoRaModel.flex,LoRaModel.label]){
