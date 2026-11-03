@@ -1,3 +1,4 @@
+import '../../utils/device_search.dart';
 import 'dart:async';
 import 'dart:io';
 import '../../utils/stable_scan_stream.dart';
@@ -65,7 +66,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
               scanResults.where((r) {
                 final name = _scanName(r);
                 
-                if (!name.toLowerCase().contains(searchText) && !r.device.remoteId.str.toLowerCase().contains(searchText)) {
+                if (!matchesDeviceNumber(searchText, [name, r.device.remoteId.str])) {
                   return false;
                 }
                 if (rssiEnabled && r.rssi < minRssi) return false;
@@ -93,7 +94,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
                     TextField(
                       controller: searchController,
                       decoration: InputDecoration(
-                        labelText: 'Search name or Bluetooth address',
+                        labelText: 'Tracker number, name or Bluetooth address',
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.search),
                         isDense: true,
@@ -133,6 +134,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
                     itemBuilder: (context, index) {
                       final result = filteredResults[index];
                       return Column(
+                        key: ValueKey(result.device.remoteId.str),
                         children: [
                           ListTile(
                             key: ValueKey(result.device.remoteId.str),

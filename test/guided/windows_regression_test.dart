@@ -54,7 +54,7 @@ void main() {
     expect(await readWindowsBluetoothEnabled(), isFalse);
     expect(calls, 3);
   });
-  test('scan publishes once per second without moving existing rows', () async {
+  test('scan publishes reorders every three seconds', () async {
     final source = StreamController<List<(String, int)>>();
     final events = <List<(String, int)>>[];
     final first = Completer<void>(), second = Completer<void>();
@@ -71,12 +71,12 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(events, isEmpty);
     await first.future.timeout(const Duration(seconds: 5));
-    expect(elapsed.elapsedMilliseconds, greaterThanOrEqualTo(1000));
+    expect(elapsed.elapsedMilliseconds, greaterThanOrEqualTo(3000));
     expect(events.single.map((x) => x.$1), ['A', 'B']);
     source.add([('B', -30), ('A', -90), ('C', -20)]);
     await second.future.timeout(const Duration(seconds: 5));
-    expect(events.last.map((x) => x.$1), ['A', 'B', 'C']);
-    expect(events.last.first.$2, -90);
+    expect(events.last.map((x) => x.$1), ['C', 'B', 'A']);
+    expect(events.last.first.$2, -20);
     source.add([('A', -50)]);
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await sub.cancel();
