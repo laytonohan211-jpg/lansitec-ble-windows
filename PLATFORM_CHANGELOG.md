@@ -37,3 +37,11 @@ Known limits shared with Android: FF84 full read/ack formats for legacy LoRa; un
 4. Record exact commit, workflow, artifact, signature/checksum and hardware-test limits after success.
 
 Release evidence: Windows code commit 108f9435a9e9f37dba9d09184f0321bca66d1d07; workflow 41612107497; release windows-1.5.3-build.5. Installer SHA256: 3252a52629bc9a43ad4c29e92039a9b9ff20730c278eb464042d8907c72e651d. Realtek/device hardware not tested. Local parity check: zero unreviewed shared differences; eight desktop adapters reviewed.
+
+## Windows 1.5.4 — connection retention (2026-11-03)
+- Request: device disconnects around 10 seconds after a successful complete parameter read.
+- Windows-only WinRT 0.0.18 patch: retain GattSession with MaintainConnection while the selected connection is owned; disable retention and close on disconnect/cleanup. Never retain a cancelled connection. No configuration command replay or artificial configuration keepalive.
+- Suspend scans for the entire connection/configuration route and reject duplicate Connect attempts. Release suspension on return, cancellation or error; scanning remains available from the list.
+- Correction to diagnosis: Connect already stopped the devices-page scan. New guard prevents competing/background scan starts during a session.
+- Android: no native WinRT patch applicable. Scan-session guard is a pending shared improvement to assess/port on the next Android update. Existing Android build unchanged.
+- Build pending. Realtek and physical-device idle stability require user testing; this is a targeted mitigation, not a confirmed hardware fix.

@@ -218,7 +218,11 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
     );
   }
 
+  bool _openingDevice = false;
   void onConnectPressed(BluetoothDevice device) async {
+    if (_openingDevice) return;
+    _openingDevice = true;
+    bool scanHeld = false;
     bool canceledByUser = false;
 
     void throwIfCanceled() {
@@ -272,6 +276,8 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
     );
 
     try {
+      await BleScanCoordinator.instance.holdForConnection();
+      scanHeld = true;
       // 先断开可能残留连接
       try {
         await device.disconnect();
@@ -318,7 +324,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
 
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop(true);
-      context.push(
+      await context.push(
         '/home/peripheral_characteristics',
         extra: {
           'device': device,
@@ -334,6 +340,9 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
       Navigator.of(context, rootNavigator: true).maybePop(false);
       debugPrint("Connect Error ${device.advName}: $e");
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connection failed: $e')));
+    } finally {
+      if (scanHeld) BleScanCoordinator.instance.releaseConnectionHold();
+      _openingDevice = false;
     }
   }
 
