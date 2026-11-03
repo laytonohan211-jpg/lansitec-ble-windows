@@ -19,13 +19,13 @@ Updated: 2026-11-03. Android source: android-release. Windows source: github-win
 | Printed number/name/address filtering, ignoring separators | 1.5.2 | retained | device_search; only identifiers actually broadcast can match |
 | Configuration JSON for support | 1.5.2 | retained | cellular tracker menu exports last-read network/tracking values; Copy JSON; not a file/share-sheet export |
 | Missing/contradictory docs reported in chat, not UI | required | retained | UI shows operational state only |
-| Ready-to-install Android APK / Windows installer | signed APK delivered | build pending | physical BLE validation still needed |
+| Ready-to-install Android APK / Windows installer | signed APK delivered | released; CI passed | physical BLE validation still needed |
 
 ## Release history and outstanding work
 - Android 1.5.0: LoRa profiles and Livestock added. Windows port was omitted.
 - Android 1.5.1: unified profile selection, removal of Trusstor and detached catalog. Windows port was omitted.
 - Android/Windows 1.5.2: number search, RSSI ordering every 3 seconds, cellular configuration JSON. Windows still lacked LoRa and unified entry: this release was NOT feature-parity complete.
-- Windows 1.5.3: brings in Android shared profiles/flow, adds Windows Livestock decoder adapter and tests, preserves desktop-specific adapters. Build status: pending.
+- Windows 1.5.3: brings in Android shared profiles/flow, adds Windows Livestock decoder adapter and tests, preserves desktop-specific adapters. Build status: passed — 74 Flutter tests, 5 decoder vectors, Windows installer and application startup verified in CI.
 - Android remains 1.5.2 for this Windows catch-up; no new APK is required for an unchanged Android implementation.
 
 Known limits shared with Android: FF84 full read/ack formats for legacy LoRa; undocumented BLE transports for UWB/PT100/temperature-humidity/Valve/Contact Tracing; Valve heartbeat and UWB interval ambiguities; Helmet offline-cache ambiguity; Contact Tracing reserved POS. Do not invent support. JSON UI currently covers cellular trackers, as in Android 1.5.2.
@@ -35,3 +35,5 @@ Known limits shared with Android: FF84 full read/ack formats for legacy LoRa; un
 2. Update this register before release, including pending platform work.
 3. Run platform regression suites, decoder vectors, build, and applicable installation/start checks.
 4. Record exact commit, workflow, artifact, signature/checksum and hardware-test limits after success.
+
+Release evidence: Windows code commit 108f9435a9e9f37dba9d09184f0321bca66d1d07; workflow 41612107497; release windows-1.5.3-build.5. Installer SHA256: 3252a52629bc9a43ad4c29e92039a9b9ff20730c278eb464042d8907c72e651d. Realtek/device hardware not tested. Local parity check: zero unreviewed shared differences; eight desktop adapters reviewed.

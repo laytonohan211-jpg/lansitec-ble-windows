@@ -21,3 +21,4 @@ User request recorded on 2026-10-26:
 - Carry forward all previously authorized shared features when updating the other platform. Preserve platform adapters (Windows BLE state, pairing, decoder runtime and export directories).
 - Do not claim a platform feature shipped until its build/tests pass and the installable artifact is verified. Record pending ports explicitly.
 - Include LoRaWAN and unified profile selection in both targets. Trusstor stays excluded. Never replace an unknown setting with a default or claim firmware confirmation from a Bluetooth write alone.
+- Before a release, run `tools/check_platform_parity.py` from the workspace root and review every listed platform adapter. Resolve unexplained differences before building.
