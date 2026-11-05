@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'log_debug_page.dart' show supportInstructions;
 
 Future<bool> confirmDeviceDisconnect(
   BuildContext context, {
@@ -31,12 +32,14 @@ Future<bool> confirmDeviceDisconnect(
 class DisconnectGuard extends StatefulWidget {
   final Widget child;
   final bool connected, busy;
+  final bool expectedDisconnect;
   final int pending;
   const DisconnectGuard({
     super.key,
     required this.child,
     required this.connected,
     this.busy = false,
+    this.expectedDisconnect = false,
     this.pending = 0,
   });
   @override
@@ -45,6 +48,13 @@ class DisconnectGuard extends StatefulWidget {
 
 class _DisconnectGuardState extends State<DisconnectGuard> {
   bool allowed = false, asking = false;
+  bool lost = false;
+  @override
+  void didUpdateWidget(covariant DisconnectGuard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.connected && !widget.connected && !allowed && !widget.expectedDisconnect) lost = true;
+    if (widget.connected) lost = false;
+  }
   Future<void> leave() async {
     if (asking || widget.busy) return;
     asking = true;
@@ -68,6 +78,11 @@ class _DisconnectGuardState extends State<DisconnectGuard> {
     onPopInvokedWithResult: (didPop, result) {
       if (!didPop) leave();
     },
-    child: widget.child,
+    child: Column(children: [Expanded(child: widget.child),
+      if (lost) Material(color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        child: SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(12),
+          child: Row(children: [const Expanded(child: SelectableText('Bluetooth disconnected. $supportInstructions')),
+            IconButton(tooltip: 'Dismiss', onPressed: () => setState(() => lost = false), icon: const Icon(Icons.close))])))),
+    ]),
   );
 }

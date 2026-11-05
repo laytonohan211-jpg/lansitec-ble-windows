@@ -1,3 +1,4 @@
+import 'log_debug_page.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -17,6 +18,8 @@ class LivestockSetupPage extends StatefulWidget {
 class _LivestockSetupPageState extends State<LivestockSetupPage> {
   final values=<int,String>{};
   final history=<String>[];
+  final sessionClock=Stopwatch()..start();
+  void log(String text) { history.add('${sessionClock.elapsedMilliseconds} ms $text'); if(history.length>200)history.removeAt(0); }
   final info=<String,String>{};
   BluetoothCharacteristic? field(String id){final found=widget.services.expand((s)=>s.characteristics).where((c)=>shortUuid(c.uuid.str)==id).toList();return found.length==1?found.first:null;}
   static const infoLabels={'ff81':'LoRaWAN region','ff82':'LoRaWAN sub-band','ff87':'Network status','2a19':'Battery','2a26':'Firmware version'};
@@ -31,7 +34,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
   }
   @override void initState(){
     super.initState();
-    link=widget.device?.connectionState.listen((s){if(!mounted)return;if(s==BluetoothConnectionState.disconnected){generation++;setState((){values.clear();info.clear();geofence='';assetRule='';status='Disconnected';});}});
+    link=widget.device?.connectionState.listen((s){if(!mounted)return;if(s==BluetoothConnectionState.disconnected){log('LINK disconnected');generation++;setState((){values.clear();info.clear();geofence='';assetRule='';status='Disconnected';});}});
     WidgetsBinding.instance.addPostFrameCallback((_){if(mounted && connected)readAll();});
   }
   @override void dispose(){generation++;link?.cancel();super.dispose();}
@@ -39,10 +42,13 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     final c=command;
     if(c==null || !connected)throw StateError('Connect to the tracker first.');
     final epoch=generation;
-    history.add('TX ${lsHex(request)}');
-    final reply=await livestockExchange(c,request,accepts:(b)=>b.length>=2 && b[0]==response && b[1]==id && (width==null || b.length==2+width));
     if(!mounted || epoch!=generation || !connected)throw StateError('Connection closed');
-    history.add('RX ${lsHex(reply)}');
+    log('TX ${lsHex(request)}');
+    late List<int> reply;
+    try { reply=await livestockExchange(c,request,accepts:(b)=>b.length>=2 && b[0]==response && b[1]==id && (width==null || b.length==2+width));
+    } catch(e){log('ERROR ${lsHex(request)}: $e');rethrow;}
+    if(!mounted || epoch!=generation || !connected)throw StateError('Connection closed');
+    log('RX ${lsHex(reply)}');
     if(history.length>100)history.removeRange(0,history.length-100);
     return reply.sublist(2);
   }
@@ -63,13 +69,13 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
         final v=p.decode(b);
         if(mounted)setState((){values[p.id]=v;status='Reading ${p.name}…';});
         failures=0;count++;
-      }catch(e){history.add('${p.name}: $e');failures++;if(failures>=3)break;}
+      }catch(e){log('${p.name}: $e');failures++;break;}
     }
-    if(mounted && connected && failures<3){
+    if(mounted && connected && failures==0){
       try{assetRule=lsHex(await exchange([0xb0,12],0x6b,12));validateAssetRule(lsBytes(assetRule));}catch(_){assetRule='';}
       try{geofence=polygonText(await exchange([0xb0,48],0x6b,48));}catch(_){geofence='';}
     }
-    if(mounted)setState((){busy=false;status=connected?'Read $count settings':'Disconnected';});
+    if(mounted)setState((){busy=false;status=connected?(failures==0?'Read $count settings':'Reading stopped after $count settings. Refresh to try again.'):'Disconnected';});
   }
   Future<bool> approve(String title,String body) async => await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
     title:Text(title),content:SingleChildScrollView(child:Text(body)),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('Confirm'))]))??false;
@@ -161,7 +167,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     try{final payload=lsHex(lsBytes(raw));final decoded=await const MethodChannel('lansitec/decoder').invokeMethod<String>('decode',{'family':'livestock','payload':payload});if(!mounted)return;await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Livestock report'),content:SingleChildScrollView(child:SelectableText(const JsonEncoder.withIndent('  ').convert(jsonDecode(decoded??'{}')))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));}catch(e){if(mounted)setState(()=>status='Could not decode report: $e');}
   }
   @override Widget build(BuildContext context)=>DisconnectGuard(connected:connected,busy:busy,child:Scaffold(
-    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.5.1',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
+    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[logDebugButton(context,widget.device,field('ff86'),busy:busy),IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.6.0', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       if(busy)const LinearProgressIndicator(),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:SelectableText(status)),

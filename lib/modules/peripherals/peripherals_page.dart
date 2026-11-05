@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import '../guided/log_debug_page.dart' show supportInstructions, redactDiagnostic;
 import '../../utils/device_search.dart';
 import 'dart:async';
 import 'dart:io';
@@ -218,7 +220,11 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
     );
   }
 
+  bool _openingDevice = false;
   void onConnectPressed(BluetoothDevice device) async {
+    if (_openingDevice) return;
+    _openingDevice = true;
+    bool scanHeld = false;
     bool canceledByUser = false;
 
     void throwIfCanceled() {
@@ -272,6 +278,8 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
     );
 
     try {
+      await BleScanCoordinator.instance.holdForConnection();
+      scanHeld = true;
       // 先断开可能残留连接
       try {
         await device.disconnect();
@@ -318,7 +326,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
 
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop(true);
-      context.push(
+      await context.push(
         '/home/peripheral_characteristics',
         extra: {
           'device': device,
@@ -333,7 +341,16 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop(false);
       debugPrint("Connect Error ${device.advName}: $e");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connection failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(seconds: 15), content: Text('Connection failed. $supportInstructions'), action: SnackBarAction(label: 'Copy diagnostics', onPressed: () => Clipboard.setData(ClipboardData(text: redactDiagnostic('Connection failed at ${DateTime.now().toIso8601String()}\nDevice: ${device.platformName} (${device.remoteId.str})\n$e'))))));
+    } finally {
+      if (scanHeld) {
+        BleScanCoordinator.instance.releaseConnectionHold();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (mounted && !device.isConnected) {
+          try { await BleScanCoordinator.instance.start(BleScanCoordinator.devicesOwner); } catch (_) {}
+        }
+      }
+      _openingDevice = false;
     }
   }
 

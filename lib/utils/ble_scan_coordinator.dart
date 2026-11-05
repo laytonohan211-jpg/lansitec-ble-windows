@@ -17,6 +17,17 @@ class BleScanCoordinator {
   static const String devicesOwner = 'devices_page';
   static const String batchConfigOwner = 'batch_config_page';
 
+  int _connectionHolds = 0;
+  Future<void> holdForConnection() async {
+    _connectionHolds++;
+    try {
+      if (FlutterBluePlus.isScanningNow) await FlutterBluePlus.stopScan();
+    } catch (_) { _connectionHolds--; rethrow; }
+  }
+  void releaseConnectionHold() {
+    if (_connectionHolds > 0) _connectionHolds--;
+  }
+
   final Set<String> _owners = <String>{};
   final StreamController<Set<String>> _ownersController =
       StreamController<Set<String>>.broadcast();
@@ -29,6 +40,7 @@ class BleScanCoordinator {
     String owner, {
     Duration timeout = const Duration(seconds: 30),
   }) async {
+    if (_connectionHolds > 0) return;
     final added = _owners.add(owner);
     if (added) {
       _emitOwners();
