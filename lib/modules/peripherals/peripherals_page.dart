@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import '../guided/log_debug_page.dart' show supportInstructions, redactDiagnostic;
 import '../../utils/device_search.dart';
 import 'dart:async';
 import 'dart:io';
@@ -339,7 +341,7 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).maybePop(false);
       debugPrint("Connect Error ${device.advName}: $e");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connection failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(seconds: 15), content: Text('Connection failed. $supportInstructions'), action: SnackBarAction(label: 'Copy diagnostics', onPressed: () => Clipboard.setData(ClipboardData(text: redactDiagnostic('Connection failed at ${DateTime.now().toIso8601String()}\nDevice: ${device.platformName} (${device.remoteId.str})\n$e'))))));
     } finally {
       if (scanHeld) {
         BleScanCoordinator.instance.releaseConnectionHold();

@@ -13,6 +13,7 @@ import 'help_page.dart';
 import 'device_tools_page.dart';
 import 'disconnect_guard.dart';
 import 'snapshot.dart';
+import 'log_debug_page.dart';
 
 const friendlyNames = <int, String>{
   1: 'Send heartbeat every',
@@ -123,6 +124,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
   int? wizard;
   final drafts = <int, String>{}, current = <int, String>{};
   final networkDrafts = <String, String>{}, networkCurrent = <String, String>{};
+  bool expectedDisconnect = false;
   final trace = <String>[];
   final controllers = <TextEditingController>[];
   final lastSent = <int, String>{};
@@ -493,7 +495,8 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       'The Bluetooth connection will close.',
     ))
       return;
-    await write(c, utf8.encode('00'));
+    setState(() => expectedDisconnect = true);
+    try { await write(c, utf8.encode('00')); } catch (_) { expectedDisconnect = false; rethrow; }
     current.clear();
     networkCurrent.clear();
     netState = '';
@@ -602,6 +605,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
   void navigate(String section) => setState(() => page = section);
   @override
   Widget build(BuildContext context) => DisconnectGuard(
+    expectedDisconnect: expectedDisconnect,
     connected: connected,
     busy: busy,
     pending: changeCount,
@@ -609,6 +613,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       appBar: AppBar(
         title: Text(page == 'Overview' ? 'Device setup' : page),
         actions: [
+          logDebugButton(context, widget.device, fields['log'], busy: busy),
           IconButton(
             tooltip: 'User guide',
             icon: const Icon(Icons.help_outline),
@@ -1464,7 +1469,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     await Clipboard.setData(
       ClipboardData(
         text:
-            'Ls BLE Guided 1.5.5\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${trace.join('\n')}',
+            'Ls BLE Guided 1.6.0\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
       ),
     );
     message('Diagnostics copied.');

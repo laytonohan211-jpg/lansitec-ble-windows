@@ -1,3 +1,4 @@
+import 'log_debug_page.dart';
 import 'uplink_decoder.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -172,7 +173,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     try{final payload=lsHex(lsBytes(raw));final decoded=await decodeUplink('livestock',payload);if(!mounted)return;await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Livestock report'),content:SingleChildScrollView(child:SelectableText(const JsonEncoder.withIndent('  ').convert(jsonDecode(decoded)))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));}catch(e){if(mounted)setState(()=>status='Could not decode report: $e');}
   }
   @override Widget build(BuildContext context)=>DisconnectGuard(connected:connected,busy:busy,child:Scaffold(
-    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.5.5', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
+    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[logDebugButton(context,widget.device,field('ff86'),busy:busy),IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.6.0', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       if(busy)const LinearProgressIndicator(),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:SelectableText(status)),

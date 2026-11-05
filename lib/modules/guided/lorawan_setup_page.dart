@@ -1,3 +1,4 @@
+import 'log_debug_page.dart';
 import 'livestock_setup_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
   final editors = <String, TextEditingController>{};
   StreamSubscription<BluetoothConnectionState>? connection;
   LoRaModel? model;
+  bool expectedDisconnect = false;
   bool busy = false, linked = false, confirming = false;
   String status = 'Reading available settings…';
   int generation = 0;
@@ -125,7 +127,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     confirming = false;
     if (!mounted || ok != true || !linked || busy) return;
     final epoch = generation;
-    setState(() { busy = true; status = 'Sending…'; });
+    setState(() { busy = true; expectedDisconnect = reboot; status = 'Sending…'; });
     try {
       await c.write(loRaWire(command), withoutResponse: !c.properties.write, timeout: 8);
       if (mounted && epoch == generation) setState(() => status =
@@ -145,12 +147,13 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     final config = characteristics['ff84'];
     final canWrite = linked && !busy && config != null &&
         (config.properties.write || config.properties.writeWithoutResponse);
-    return DisconnectGuard(connected: linked, busy: busy, child: Scaffold(
+    return DisconnectGuard(expectedDisconnect: expectedDisconnect, connected: linked, busy: busy, child: Scaffold(
       appBar: AppBar(title: const Text('LoRaWAN setup'), actions: [
+        logDebugButton(context, widget.device, characteristics['ff86'], busy: busy),
         IconButton(tooltip: 'Read current fields', onPressed: busy || !linked ? null : read, icon: const Icon(Icons.refresh)),
         IconButton(tooltip: 'Copy diagnostics', onPressed: () async {
           await Clipboard.setData(ClipboardData(text: [
-            'Ls BLE Guided 1.5.5 — LoRaWAN', widget.device.platformName,
+            'Ls BLE Guided 1.6.0 — LoRaWAN', widget.device.platformName,
             'Selected model: ${model?.name ?? 'none'}', status,
             for (final e in characteristics.entries)
               '${e.key} ${loRaFields[e.key]} read=${e.value.properties.read} write=${e.value.properties.write} withoutResponse=${e.value.properties.writeWithoutResponse}: ${values[e.key] ?? 'not read'}',
