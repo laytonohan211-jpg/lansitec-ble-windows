@@ -1,7 +1,7 @@
 [Setup]
 AppId={{C7181B89-FBC1-418F-A05F-53D5BB6BE457}
 AppName=Ls BLE Guided
-AppVersion=1.6.0
+AppVersion=1.6.1
 DefaultDirName={localappdata}\Programs\Ls BLE Guided
 DefaultGroupName=Ls BLE Guided
 PrivilegesRequired=lowest

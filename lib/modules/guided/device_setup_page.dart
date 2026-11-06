@@ -1,3 +1,4 @@
+import 'battery_info.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -107,6 +108,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
   RadioFamily? family;
   String? model;
   StreamSubscription<BluetoothConnectionState>? subscription;
+  String? battery;
   String page = 'Overview', status = '', nickname = '', netState = '';
   Color statusColor = Colors.blue;
   bool busy = false, readyForWrites = true;
@@ -180,6 +182,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         current.clear();
         networkCurrent.clear();
         netState = '';
+        battery = null;
       }
       setState(() {});
     });
@@ -293,6 +296,10 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
   Future<void> _readCurrentSettings({bool quiet = false}) async {
     if (!connected) throw StateError('Reconnect to read settings.');
     final epoch = connectionEpoch;
+    setState(()=>battery=null);
+    final level=await readBattery(services, active:()=>mounted && connected && epoch==connectionEpoch);
+    if(!mounted || !connected || epoch!=connectionEpoch)return;
+    setState(()=>battery=level);
     final readers = <String, Future<List<int>> Function()>{};
     final config = fields['configuration'];
     if (config != null && config.properties.read)
@@ -879,6 +886,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
           ),
         ),
       ),
+      ListTile(leading:const Icon(Icons.battery_std), title:const Text('Battery'), subtitle:Text(battery??'Not available')),
       const SizedBox(height: 12),
       FilledButton(
         onPressed:
@@ -1469,7 +1477,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     await Clipboard.setData(
       ClipboardData(
         text:
-            'Ls BLE Guided 1.6.0\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
+            'Ls BLE Guided 1.6.1\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
       ),
     );
     message('Diagnostics copied.');

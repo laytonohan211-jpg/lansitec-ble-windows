@@ -1,3 +1,4 @@
+import 'battery_info.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'beacon_values.dart';
@@ -20,6 +21,7 @@ class BeaconSnapshot extends StatefulWidget {
 }
 
 class _BeaconSnapshotState extends State<BeaconSnapshot> {
+  String? battery;
   Map<String, List<int>> values = {};
   final Map<String, String> errors = {};
   bool busy = false, attempted = false;
@@ -36,6 +38,7 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
         epoch++;
         setState(() {
           values.clear();
+          battery=null;
           attempted = false;
           status = 'Disconnected';
         });
@@ -71,6 +74,10 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
       errors.clear();
       status = 'Reading…';
     });
+    battery=null;
+    final level=await readBattery(widget.services, active:()=>mounted && widget.device.isConnected && epoch==generation);
+    if(!mounted || !widget.device.isConnected || epoch!=generation){if(mounted)setState(()=>busy=false);return;}
+    setState(()=>battery=level);
     final readers = <String, Future<List<int>> Function()>{},
         duplicates = <String>{};
     for (final s in widget.services.where(
@@ -275,10 +282,11 @@ class _BeaconSnapshotState extends State<BeaconSnapshot> {
           ],
         ),
         Text(status),
+        ListTile(leading:const Icon(Icons.battery_std), title:const Text('Battery'), subtitle:Text(battery??'Not available')),
         TextButton.icon(
           onPressed: () async {
             final report = [
-              'Ls BLE Guided 1.6.0 — beacon',
+              'Ls BLE Guided 1.6.1 — beacon',
               'Name: ${widget.device.platformName}',
               for (final s in widget.services)
                 'Service ${s.uuid.str}: ${s.characteristics.map((c) => '${c.uuid.str} read=${c.properties.read} write=${c.properties.write || c.properties.writeWithoutResponse}').join(', ')}',
