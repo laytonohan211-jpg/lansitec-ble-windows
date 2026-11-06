@@ -215,7 +215,7 @@ class _PeripheralCharacteristicsPageState
                 tooltip: 'Copy device diagnostics',
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: [
-                    'Ls BLE Guided 1.6.0 — device profile',
+                    'Ls BLE Guided 1.6.1 — device profile',
                     'Name: ${widget.device.platformName}',
                     'Beacon profile: $_beaconGatt',
                     for (final s in _services)

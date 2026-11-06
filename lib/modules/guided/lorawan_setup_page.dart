@@ -1,3 +1,4 @@
+import 'battery_info.dart';
 import 'log_debug_page.dart';
 import 'livestock_setup_page.dart';
 import 'dart:async';
@@ -18,6 +19,7 @@ class LoRaSetupPage extends StatefulWidget {
 }
 
 class _LoRaSetupPageState extends State<LoRaSetupPage> {
+  String? battery;
   final values = <String, String>{};
   final editors = <String, TextEditingController>{};
   StreamSubscription<BluetoothConnectionState>? connection;
@@ -44,6 +46,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         if (!linked) {
           generation++;
           values.clear();
+          battery=null;
           status = 'Disconnected. Reconnect to read current settings.';
         }
       });
@@ -77,6 +80,10 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
     if (!mounted || busy || !linked) return;
     final epoch = generation;
     setState(() { busy = true; values.clear(); status = 'Reading available settings…'; });
+    battery=null;
+    final level=await readBattery(widget.services, active:()=>mounted && linked && epoch==generation);
+    if(!mounted || !linked || epoch!=generation){if(mounted)setState(()=>busy=false);return;}
+    setState(()=>battery=level);
     var count = 0;
     for (final entry in characteristics.entries) {
       if (!mounted || epoch != generation) break;
@@ -153,7 +160,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         IconButton(tooltip: 'Read current fields', onPressed: busy || !linked ? null : read, icon: const Icon(Icons.refresh)),
         IconButton(tooltip: 'Copy diagnostics', onPressed: () async {
           await Clipboard.setData(ClipboardData(text: [
-            'Ls BLE Guided 1.6.0 — LoRaWAN', widget.device.platformName,
+            'Ls BLE Guided 1.6.1 — LoRaWAN', widget.device.platformName,
             'Selected model: ${model?.name ?? 'none'}', status,
             for (final e in characteristics.entries)
               '${e.key} ${loRaFields[e.key]} read=${e.value.properties.read} write=${e.value.properties.write} withoutResponse=${e.value.properties.writeWithoutResponse}: ${values[e.key] ?? 'not read'}',
@@ -167,6 +174,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         const SizedBox(height: 12),
         if (busy) const LinearProgressIndicator(),
         SelectableText(status),
+        ListTile(leading:const Icon(Icons.battery_std), title:const Text('Battery'), subtitle:Text(battery??'Not available')),
         const SizedBox(height: 16),
         const Text('Read from device', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         for (final e in characteristics.entries)

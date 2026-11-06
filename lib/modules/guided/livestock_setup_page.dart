@@ -1,3 +1,4 @@
+import 'battery_info.dart';
 import 'log_debug_page.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -22,7 +23,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
   void log(String text) { history.add('${sessionClock.elapsedMilliseconds} ms $text'); if(history.length>200)history.removeAt(0); }
   final info=<String,String>{};
   BluetoothCharacteristic? field(String id){final found=widget.services.expand((s)=>s.characteristics).where((c)=>shortUuid(c.uuid.str)==id).toList();return found.length==1?found.first:null;}
-  static const infoLabels={'ff81':'LoRaWAN region','ff82':'LoRaWAN sub-band','ff87':'Network status','2a19':'Battery','2a26':'Firmware version'};
+  static const infoLabels={'ff81':'LoRaWAN region','ff82':'LoRaWAN sub-band','ff87':'Network status','battery':'Battery','2a26':'Firmware version'};
   bool busy=false;
   String status='',geofence='',assetRule='';
   int generation=0;
@@ -56,7 +57,11 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     if(busy || !connected || command==null)return;
     setState((){busy=true;values.clear();status='Reading tracker…';});
     final epoch=generation;
-    for(final id in infoLabels.keys){
+    info.remove('battery');
+    final battery=await readBattery(widget.services, livestock:true, active:()=>mounted && connected && epoch==generation);
+    if(!mounted || !connected || epoch!=generation){if(mounted)setState(()=>busy=false);return;}
+    setState(()=>info['battery']=battery??'Not available');
+    for(final id in infoLabels.keys.where((id)=>id!='battery')){
       final c=field(id);
       if(c==null || !c.properties.read)continue;
       try{final b=await c.read(timeout:3);if(!mounted || epoch!=generation)break;final text=id=='2a19' && b.length==1?'${b.first}%':utf8.decode(b).replaceAll(RegExp(r'\x00+$'),'').trim();setState(()=>info[id]=text);}catch(_){info.remove(id);}
@@ -167,7 +172,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     try{final payload=lsHex(lsBytes(raw));final decoded=await const MethodChannel('lansitec/decoder').invokeMethod<String>('decode',{'family':'livestock','payload':payload});if(!mounted)return;await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Livestock report'),content:SingleChildScrollView(child:SelectableText(const JsonEncoder.withIndent('  ').convert(jsonDecode(decoded??'{}')))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));}catch(e){if(mounted)setState(()=>status='Could not decode report: $e');}
   }
   @override Widget build(BuildContext context)=>DisconnectGuard(connected:connected,busy:busy,child:Scaffold(
-    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[logDebugButton(context,widget.device,field('ff86'),busy:busy),IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.6.0', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
+    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[logDebugButton(context,widget.device,field('ff86'),busy:busy),IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:['Ls BLE Guided 1.6.1', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n')));},icon:const Icon(Icons.copy))]),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       if(busy)const LinearProgressIndicator(),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:SelectableText(status)),
