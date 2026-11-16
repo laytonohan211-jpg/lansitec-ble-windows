@@ -1,3 +1,4 @@
+import 'mqtt_address.dart';
 import 'battery_info.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -1244,6 +1245,10 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
             child: SelectableText(netState),
           ),
         ),
+      heading('Investigate a missing report'),
+      const Text('Check these separately: mobile-network registration; MQTT broker connection and authentication; TLS negotiation; GNSS position fix. A Bluetooth connection or a saved setting does not confirm any of these. Use the device network response, Log & Debug, and broker logs to identify the last successful step. No coordinates alone do not prove a GNSS hardware fault.'),
+      const SizedBox(height: 8),
+      const Text('Copy diagnostics and the relevant Log & Debug messages. Email alessandro.paperi@lansitec.com with model, firmware, time of the failure and broker-side error. Remove credentials before sharing.'),
       heading('Device information'),
       for (final name in ['Device IMEI', 'Device IMSI', 'Device CCID'])
         if (fields.containsKey(norm(name)))
@@ -1477,7 +1482,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     await Clipboard.setData(
       ClipboardData(
         text:
-            'Ls BLE Guided 1.6.1\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
+            'Ls BLE Guided 1.6.2\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
       ),
     );
     message('Diagnostics copied.');
@@ -1681,6 +1686,8 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                               labelText: 'Value',
                             ),
                           ),
+                        if (!readonly && name == 'HostName(URL/IP)')
+                          const Text('MQTT with TLS: enter mqtts:// followed by the broker hostname. Set the broker port separately (commonly 8883). Readback must retain the prefix; a matching value confirms storage, not a successful TLS connection.'),
                         if (!readonly &&
                             (name.contains('User') || name == 'APN Name'))
                           CheckboxListTile(
@@ -1754,12 +1761,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         throw FormatException('Port must be 1–65535.');
       }
     }
-    if (name == 'HostName(URL/IP)' &&
-        (v.contains('/') || RegExp(r'\s').hasMatch(v))) {
-      throw FormatException(
-        'Use a hostname or IP address, without URL scheme/path.',
-      );
-    }
+    if (name == 'HostName(URL/IP)') validateMqttAddress(v);
     if (name == 'MQTT PubTopic' && (v.contains('#') || v.contains('+'))) {
       throw FormatException('Publish topics cannot contain wildcards.');
     }
