@@ -173,6 +173,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         Text(widget.device.platformName, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         if (busy) const LinearProgressIndicator(),
+        const ExpansionTile(title: Text('Reporting and connection help'), children: [Padding(padding: EdgeInsets.all(12), child: Text('A Bluetooth connection confirms only the local link. Check LoRaWAN join and uplink reception separately in your network server. For devices with GNSS, heartbeat does not guarantee a new position: check positioning enable, reporting interval and search duration, then verify a timestamped fix outdoors. Use downlinks for this model and transport; do not copy cellular MQTT commands. If reports are missing, copy diagnostics and Log & Debug messages and email alessandro.paperi@lansitec.com with model, firmware and time of the issue.'))]),
         SelectableText(status),
         ListTile(leading:const Icon(Icons.battery_std), title:const Text('Battery'), subtitle:Text(battery??'Not available')),
         const SizedBox(height: 16),
