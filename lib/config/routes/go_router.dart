@@ -16,7 +16,7 @@ class AppRouter {
     router = GoRouter(
       navigatorKey: rootNavigatorKey,
       initialLocation: '/home',
-      debugLogDiagnostics: true,
+      debugLogDiagnostics: false,
       routes: [
         StatefulShellRoute.indexedStack(
           builder: (context, state, navigationShell) {

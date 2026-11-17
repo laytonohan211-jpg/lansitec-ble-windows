@@ -34,6 +34,12 @@ class _RemotePageState extends State<RemotePage> {
       return;
     }
 
+    final approved = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Send this name to Lansitec?'),
+      content: const Text('This optional request sends the entered name to asset.lansitec.com. The server also receives your IP address. Do not enter passwords or personal information. Local Bluetooth setup works without this request.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send'))]));
+    if (!mounted || approved != true) return;
     loading.value = true;
 
     try {
@@ -42,6 +48,7 @@ class _RemotePageState extends State<RemotePage> {
         queryParameters: {'name': name},
       );
 
+      if (!mounted) return;
       final code = response.data['code'];
       if (code == 200) {
         responseText.value = 'Request success: ${response.data['msg'] ?? ''}';
@@ -49,11 +56,13 @@ class _RemotePageState extends State<RemotePage> {
         responseText.value = 'Request failed, code=$code';
       }
     } on DioException catch (e) {
+      if (!mounted) return;
       responseText.value = 'Request error: ${e.message}';
     } catch (e) {
+      if (!mounted) return;
       responseText.value = 'Unknown error: $e';
     } finally {
-      loading.value = false;
+      if (mounted) loading.value = false;
     }
   }
 

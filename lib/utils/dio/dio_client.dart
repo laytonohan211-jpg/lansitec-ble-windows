@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:dio/dio.dart';
 import 'package:flutter_blue/utils/interceptor/http_interceptor.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
@@ -29,13 +30,13 @@ class DioClient {
       ),
     );
 
-    if (debug) {
+    if (debug && kDebugMode) {
       dio.interceptors.add(
         PrettyDioLogger(
-          requestHeader: true,
-          requestBody: true,
-          responseHeader: true,
-          responseBody: true,
+          requestHeader: false,
+          requestBody: false,
+          responseHeader: false,
+          responseBody: false,
         ),
       );
     }
