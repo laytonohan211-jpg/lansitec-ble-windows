@@ -1,10 +1,10 @@
 name: Build Android LoRaWAN
 on:
   push:
-    branches: [android-lorawan-1.4]
+    branches: [security-review-android]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,12 +38,3 @@ jobs:
           gradle -p android wrapper --gradle-version 8.10.2
       - name: Build APK
         run: flutter build apk --release
-      - name: Bundle unsigned APK for local signing
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk dist/UNSIGNED-app.apk
-          (cd dist && sha256sum UNSIGNED-app.apk > SHA256SUMS && zip Android-1.6.2-unsigned-build.zip UNSIGNED-app.apk SHA256SUMS)
-          TAG=android-1.6.2-build.${{ github.run_number }}
-          gh release create "$TAG" dist/Android-1.6.2-unsigned-build.zip --target "$GITHUB_SHA" --prerelease --title "Android 1.6.2 build ${{ github.run_number }} — unsigned intermediate" --notes "Build intermediate only. This unsigned APK requires local signing with the existing app key before installation."
