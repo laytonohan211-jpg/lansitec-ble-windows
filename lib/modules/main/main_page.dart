@@ -34,7 +34,7 @@ class MainPage extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
             activeIcon: Icon(Icons.settings),
-            label: 'Remote',
+            label: 'Support',
           ),
         ],
       ),

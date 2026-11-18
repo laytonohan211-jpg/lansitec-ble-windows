@@ -96,3 +96,14 @@ Solo in caso di errore di connessione già rilevato o disconnessione inattesa, i
 
 - Product scope: cellular changes shared across all supported Cat-1 and NB-IoT/LTE-M tracker/gateway profiles. LoRaWAN setup and Livestock setup additionally expose collapsed transport-specific reporting guidance; no cellular MQTT/TLS writes applied to LoRaWAN or beacons. Existing beacon guidance preserved. Zero unreviewed platform differences; existing platform adapters unchanged. No real-device TLS or motion-only GNSS behavior claimed verified.
 - Download verification: Windows installer SHA256 f86c86c85736c79acda18c0693f0775f47cb637299b4ee4d629438c9102ae0c5 and product version 1.6.2 confirmed. Android intermediate ZIP/APK hashes checked; signed APK identity/version 1.6.2+28, v1/v2/v3 signatures and alignment verified with existing certificate. Installable: dist/android-1.6.2/Ls_BLE_Guided_1.6.2_Android.apk.
+
+## Security/privacy preparation — 2026-11-17, NOT RELEASED
+- Scope EU/USA, Lansitec, contact alessandro.paperi@lansitec.com. See SECURITY_PRIVACY_REVIEW.md for evidence, unresolved requirements and release gates.
+- Shared source changes: text_styles.dart, go_router.dart, dio_client.dart, remote_page.dart. Android manifest backup/cleartext hardening. Tests/builds still pending, delivered app remains 1.6.2.
+
+## Offline support operating model — 2026-11-17 (pending release)
+- Requirement: no remotely managed online service; diagnostics only by voluntary normal email to app contact.
+- Both Android and Windows: replace Remote request UI with local Support instructions, remove server endpoint/client registration; retain internal route for compatibility.
+- Files: lib/modules/remote/remote_page.dart, lib/modules/main/main_page.dart, lib/locator.dart, lib/constants/app_constants.dart, test/guided/privacy_remote_test.dart; SECURITY_PRIVACY_REVIEW.md records user-confirmed handling/access and unresolved retention/entity verification.
+- Android and Windows version: still 1.6.2 working trees; NOT shipped. Shared changes identical; parity checked separately. Flutter test/build of this revision pending, no new artifacts.
+- No BLE transport, pacing, scan order or configuration protocol changes. This does not establish complete privacy compliance or guarantee removal of sensitive data from existing reports.

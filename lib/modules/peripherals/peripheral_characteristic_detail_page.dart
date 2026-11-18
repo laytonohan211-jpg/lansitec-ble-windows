@@ -1,3 +1,4 @@
+import 'package:flutter_blue/utils/safe_export.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -644,10 +645,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
       final time = splitIndex != -1 ? log.substring(0, splitIndex) : '';
       final value = splitIndex != -1 ? log.substring(splitIndex + 2) : log;
 
-      // 如果 value 里有逗号，包裹双引号
-      final safeValue = value.contains(',') ? '"$value"' : value;
-
-      csv += '="$time",$safeValue\n';
+      csv += csvRow([time, value]);
     }
 
     try {

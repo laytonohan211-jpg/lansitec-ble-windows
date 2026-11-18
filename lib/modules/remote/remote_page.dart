@@ -1,207 +1,70 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter_blue/locator.dart';
-import 'package:flutter_blue/utils/dio/dio_client.dart';
+import 'package:flutter_blue/modules/guided/preferences.dart';
 
-class RemotePage extends StatefulWidget {
+/// Local support instructions. No network client or automatic submission.
+class RemotePage extends StatelessWidget {
   const RemotePage({super.key});
-
-  @override
-  State<RemotePage> createState() => _RemotePageState();
-}
-
-class _RemotePageState extends State<RemotePage> {
-  // final Dio dio = Dio();
-  final DioClient dioClient = getIt<DioClient>();
-
-  final TextEditingController nameController = TextEditingController();
-
-  /// 用 ValueNotifier 管理结果文本
-  final ValueNotifier<String> responseText = ValueNotifier<String>(
-    'Please enter name and request',
-  );
-
-  /// 用 ValueNotifier 管理 loading 状态
-  final ValueNotifier<bool> loading = ValueNotifier<bool>(false);
-  final ValueNotifier<bool> configuring = ValueNotifier(false); // 开启/停止配置
-  final ValueNotifier<bool?> upgradeSuccess = ValueNotifier(null); // 配置成功/失败
-  /// 新增，用于显示配置状态
-  final ValueNotifier<String> configStatusText = ValueNotifier<String>('');
-
-  Future<void> fetchConfig(String name) async {
-    if (name.isEmpty) {
-      responseText.value = 'Name cannot be empty';
-      return;
-    }
-
-    final approved = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Send this name to Lansitec?'),
-      content: const Text('This optional request sends the entered name to asset.lansitec.com. The server also receives your IP address. Do not enter passwords or personal information. Local Bluetooth setup works without this request.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send'))]));
-    if (!mounted || approved != true) return;
-    loading.value = true;
-
-    try {
-      final response = await dioClient.get(
-        '/captchaImage',
-        queryParameters: {'name': name},
-      );
-
-      if (!mounted) return;
-      final code = response.data['code'];
-      if (code == 200) {
-        responseText.value = 'Request success: ${response.data['msg'] ?? ''}';
-      } else {
-        responseText.value = 'Request failed, code=$code';
-      }
-    } on DioException catch (e) {
-      if (!mounted) return;
-      responseText.value = 'Request error: ${e.message}';
-    } catch (e) {
-      if (!mounted) return;
-      responseText.value = 'Unknown error: $e';
-    } finally {
-      if (mounted) loading.value = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    nameController.dispose();
-    responseText.dispose();
-    loading.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Remote Config')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(title: const Text('Support')),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// 输入框
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            /// 请求按钮
-            ValueListenableBuilder<bool>(
-              valueListenable: loading,
-              builder: (context, isLoading, _) {
-                return SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed:
-                        isLoading
-                            ? null
-                            : () => fetchConfig(nameController.text.trim()),
-                    child:
-                        isLoading
-                            ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Text('Fetch Config'),
-                  ),
-                );
-              },
-            ),
-
+            const Text('Local data', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text('Bluetooth device information and settings are processed on this device. '
+                'Saved profiles, nicknames and batch history stay here until you remove them. '
+                'Use the batch history screens to clear their records. Exported files and '
+                'clipboard copies must be removed separately.'),
+            TextButton(onPressed: () async {
+              final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+                title: const Text('Delete saved profiles and nicknames?'),
+                content: const Text('This removes local saved profiles and device nicknames. '
+                    'It does not change device settings or delete exported files or email.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))]));
+              if (confirmed != true) return;
+              try {
+                final box = await GuidedPreferences.box();
+                await box.clear();
+                await box.compact();
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Saved profiles and nicknames deleted')));
+              } catch (_) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not delete local data. Please try again.')));
+              }
+            }, child: const Text('Delete saved profiles and nicknames')),
+            TextButton(onPressed: () => showLicensePage(context: context,
+              applicationName: 'Ls BLE Guided'), child: const Text('Third-party licenses')),
             const SizedBox(height: 16),
-
-            /// 响应结果
-            ValueListenableBuilder<String>(
-              valueListenable: responseText,
-              builder: (context, text, _) {
-                return Text(text, style: const TextStyle(fontSize: 14));
-              },
-            ),
-            const SizedBox(height: 16),
-
-            /// 开启/停止配置按钮
-            ValueListenableBuilder<bool>(
-              valueListenable: configuring,
-              builder: (context, isConfiguring, _) {
-                return SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (responseText.value ==
-                              'Please enter name and request' ||
-                          responseText.value == 'Name cannot be empty' ||
-                          responseText.value.trim().isEmpty) {
-                        configStatusText.value =
-                            'Response text cannot be empty';
-                        return;
-                      }
-
-                      configuring.value = !isConfiguring;
-
-                      // 只更新配置状态，不动 responseText
-                      configStatusText.value =
-                          isConfiguring
-                              ? 'Configuration stopped'
-                              : 'Configuration started...';
-
-                      // TODO: 调用 BLE 批量写入或停止任务
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isConfiguring ? Colors.red : Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                    icon: Icon(
-                      isConfiguring ? Icons.stop : Icons.play_arrow,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    label: Text(isConfiguring ? 'Stop Config' : 'Start Config'),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            /// 配置状态显示
-            ValueListenableBuilder<String>(
-              valueListenable: configStatusText,
-              builder: (context, status, _) {
-                return Text(
-                  status,
-                  style: const TextStyle(fontSize: 14, color: Colors.blue),
-                );
-              },
-            ),
-
-            const SizedBox(height: 12),
-
-            /// 升级/配置结果显示
-            ValueListenableBuilder<bool?>(
-              valueListenable: upgradeSuccess,
-              builder: (context, success, _) {
-                if (success == null) return const SizedBox();
-                return Text(
-                  success
-                      ? 'Configuration success ✅'
-                      : 'Configuration failed ❌',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: success ? Colors.green : Colors.red,
-                  ),
-                );
-              },
-            ),
+            Text('Optional diagnostic reports',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Text('If you need help, open the affected device page and use its '
+                'diagnostic report copy option. For device logs, open Log & Debug '
+                'when available and copy the relevant entries.'),
+            SizedBox(height: 16),
+            Text('Review the report before sharing it. It may contain device '
+                'identifiers, settings or location information. Remove passwords, '
+                'keys and information that is not needed for your request.'),
+            SizedBox(height: 16),
+            Text('You can paste the report into your own email application and '
+                'send it to:'),
+            SelectableText('alessandro.paperi@lansitec.com'),
+            SizedBox(height: 16),
+            Text('Sending a report is optional. This page does not upload data '
+                'or send email. Bluetooth configuration does not require a '
+                'remote service.'),
+            SizedBox(height: 16),
+            Text('Reports you choose to email are handled by Lansitec as support '
+                'and commercial correspondence in its company systems. Internal '
+                'access is limited to the app and commercial contact and, when '
+                'needed, their supervisors. Contact the address above with '
+                'questions about your report or to request its deletion.'),
           ],
         ),
       ),

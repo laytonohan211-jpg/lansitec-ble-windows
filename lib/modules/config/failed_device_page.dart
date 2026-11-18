@@ -1,3 +1,4 @@
+import 'package:flutter_blue/utils/safe_export.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_blue/locator.dart';
@@ -287,7 +288,7 @@ class _FailedDevicePageState extends State<FailedDevicePage> {
             "Name,MAC,MAJOR,MINOR,TX Power,Interval(ms),Hardware,Message\n";
         for (var d in failedDevices) {
           csv +=
-              "${d.name},${d.id},${d.major},${d.minor},${d.txPower},${d.interval},${d.hardware},${d.message}\n";
+              csvRow([d.name,d.id,d.major,d.minor,d.txPower,d.interval,d.hardware,d.message]);
         }
 
         try {

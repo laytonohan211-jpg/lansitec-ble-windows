@@ -1,0 +1,13 @@
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    app.tasks.register('inventoryReleaseDependencies') {
+        doLast {
+            def components = app.configurations.getByName('releaseRuntimeClasspath').resolvedConfiguration.resolvedArtifacts.collect {
+                [group: it.moduleVersion.id.group, name: it.moduleVersion.id.name, version: it.moduleVersion.id.version]
+            }.unique().sort { a,b -> "${a.group}:${a.name}" <=> "${b.group}:${b.name}" }
+            def out = new File(gradle.rootProject.projectDir.parentFile, 'dist/GRADLE_DEPENDENCIES.json')
+            out.parentFile.mkdirs()
+            out.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(components))
+        }
+    }
+}

@@ -159,12 +159,12 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         logDebugButton(context, widget.device, characteristics['ff86'], busy: busy),
         IconButton(tooltip: 'Read current fields', onPressed: busy || !linked ? null : read, icon: const Icon(Icons.refresh)),
         IconButton(tooltip: 'Copy diagnostics', onPressed: () async {
-          await Clipboard.setData(ClipboardData(text: [
-            'Ls BLE Guided 1.6.2 — LoRaWAN', widget.device.platformName,
+          await Clipboard.setData(ClipboardData(text: redactDiagnostic([
+            'Ls BLE Guided 1.6.3 — LoRaWAN', widget.device.platformName,
             'Selected model: ${model?.name ?? 'none'}', status,
             for (final e in characteristics.entries)
               '${e.key} ${loRaFields[e.key]} read=${e.value.properties.read} write=${e.value.properties.write} withoutResponse=${e.value.properties.writeWithoutResponse}: ${values[e.key] ?? 'not read'}',
-          ].join('\n')));
+          ].join('\n'))));
           if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Diagnostics copied')));
         }, icon: const Icon(Icons.copy)),
