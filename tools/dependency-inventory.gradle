@@ -1,5 +1,6 @@
 gradle.projectsEvaluated {
-    def app = gradle.rootProject.project(':app')
+    def app = gradle.rootProject.findProject(':app')
+    if (app == null) return
     app.tasks.register('inventoryReleaseDependencies') {
         doLast {
             def components = app.configurations.getByName('releaseRuntimeClasspath').resolvedConfiguration.resolvedArtifacts.collect {
@@ -11,3 +12,4 @@ gradle.projectsEvaluated {
         }
     }
 }
+
