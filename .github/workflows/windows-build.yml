@@ -46,6 +46,8 @@ jobs:
         run: |
           flutter test test/guided --timeout 60s
           if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+          node test/guided/decoder_security_test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Decoder boundary tests failed' }
           node test/guided/livestock_decoder_test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Livestock decoder tests failed' }
       - name: Compile Windows application
@@ -87,4 +89,5 @@ jobs:
           name: Ls-BLE-Guided-Windows-x64
           path: dist/*
           if-no-files-found: error
+
 

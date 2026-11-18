@@ -46,3 +46,11 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+# Release signing material must remain outside the source tree.
+*.keystore
+*.jks
+*.p12
+*.pfx
+key.properties
+*.credential.xml
+
