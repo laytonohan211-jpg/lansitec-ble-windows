@@ -484,4 +484,5 @@ if (typeof module !== "undefined" && module.exports) {
     };
 }
 
-function decodeChecked(hex) { var bytes=[]; for(var i=0;i<hex.length;i+=2)bytes.push(parseInt(hex.substr(i,2),16)); return decodeUplink({fPort:8,bytes:bytes}); }
+function decodeChecked(hex) { if(typeof hex !== 'string' || !/^[0-9a-f]+$/i.test(hex) || hex.length%2 || hex.length>8192) throw new Error('Invalid hexadecimal payload'); var bytes=[]; for(var i=0;i<hex.length;i+=2)bytes.push(parseInt(hex.substr(i,2),16)); return decodeUplink({fPort:8,bytes:bytes}); }
+

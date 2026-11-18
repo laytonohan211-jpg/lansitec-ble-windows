@@ -34,6 +34,7 @@ jobs:
       - name: Tests
         run: |
           flutter test test/guided --timeout 60s
+          node test/guided/decoder_security_test.cjs
           node test/guided/livestock_decoder_test.cjs
       - name: Prepare Android wrapper
         run: |
@@ -53,4 +54,5 @@ jobs:
           name: Ls-BLE-Guided-Android-candidate
           path: dist/*
           if-no-files-found: error
+
 

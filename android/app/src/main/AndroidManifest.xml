@@ -22,7 +22,7 @@
     <application
         android:allowBackup="false"
         android:usesCleartextTraffic="false"
-        android:label="Ls BLE Guided Test"
+        android:label="Ls BLE Guided"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
         android:enableOnBackInvokedCallback="true">
@@ -72,3 +72,4 @@
         </intent>
     </queries>
 </manifest>
+
