@@ -6,16 +6,28 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 const supportInstructions = 'Use Copy diagnostics, then paste the report into an email to alessandro.paperi@lansitec.com. Describe what happened and the device model.';
 
-String redactDiagnostic(String text) => text.split('\n').map((line) =>
-  RegExp(r'password|passwd|psw|passkey|appkey|nwkskey|appskey', caseSensitive: false).hasMatch(line)
-    ? '[Credential line omitted]' : line).join('\n');
+String redactDiagnostic(String text) => text.split('\n').map((line) {
+  if (RegExp(r'password|passwd|psw|passkey|app[ _-]?key|nwk[ _-]?s[ _-]?key|app[ _-]?s[ _-]?key|authorization|secret|token|username', caseSensitive: false).hasMatch(line)) {
+    return '[Credential line omitted]';
+  }
+  if (RegExp(r'\b(IMEI|IMSI|ICCID|latitude|longitude|DevEUI|JoinEUI)\b', caseSensitive: false).hasMatch(line)) {
+    return '[Identifier/location line omitted]';
+  }
+  return line.replaceAll(RegExp(r'\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\b', caseSensitive: false), '[Bluetooth address omitted]');
+}).join('\n');
+
+String boundedDeviceLog(List<int> bytes) {
+  const limit = 8192;
+  final text = utf8.decode(bytes.take(limit).toList(), allowMalformed: true).replaceAll('\u0000', '');
+  return bytes.length > limit ? '$text [truncated]' : text;
+}
 
 class DeviceLogEntry {
   final DateTime time;
   final String text;
   DeviceLogEntry(List<int> bytes, {DateTime? time})
       : time = time ?? DateTime.now(),
-        text = utf8.decode(bytes, allowMalformed: true).replaceAll('\u0000', '');
+        text = boundedDeviceLog(bytes);
   String get line => '${time.toIso8601String()}  $text';
 }
 
@@ -147,7 +159,7 @@ class _LogDebugPageState extends State<LogDebugPage> {
     body: Column(children: [
       Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${widget.device.platformName} — ${c.uuid.str}'),
-        const Text('Original device messages (UTF-8). Latest 500 messages, newest first.'),
+        const Text('Original device messages (UTF-8). Latest 500 messages, up to 8 KB each. Review copied logs before sharing; filtering is not anonymization.'),
         Wrap(spacing: 12, children: [
           OutlinedButton(onPressed: busy || !connected || !c.properties.read ? null : read, child: const Text('Read again')),
           if (c.properties.notify || c.properties.indicate)

@@ -1,3 +1,4 @@
+import 'package:flutter_blue/utils/safe_export.dart';
 import 'mqtt_address.dart';
 import 'battery_info.dart';
 import 'dart:async';
@@ -1453,7 +1454,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       'schemaVersion': 1, 'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'device': {'name': deviceTitle, 'bluetoothId': widget.device.remoteId.str,
         'model': model, 'connectivity': family?.name, 'connected': connected},
-      'network': Map<String,String>.from(networkCurrent),
+      'network': supportNetwork(networkCurrent),
       'tracking': [if (model != null) for (final p in parameters(model!)) {
         'id': p.id, 'name': settingName(p), 'raw': current[p.id],
         'value': current[p.id] == null ? null : valueLabel(p, current[p.id]!),
@@ -1467,7 +1468,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       title: const Text('Export configuration JSON'),
       content: SizedBox(width: 550, child: SingleChildScrollView(child: Column(
         mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
-        children: [const Text('Contains the last read settings, including network credentials. Share only with trusted support.'),
+        children: [const Text('Known username and password fields are omitted. Device identifiers and settings remain: review the report before sharing it with support.'),
           const SizedBox(height: 12), SelectableText(json)],
       ))),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
@@ -1482,7 +1483,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     await Clipboard.setData(
       ClipboardData(
         text:
-            'Ls BLE Guided 1.6.2\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
+            'Ls BLE Guided 1.6.3\nModel: $model\nRadio: ${family?.name}\nGATT: ${services.where((s) => shortUuid(s.uuid.str) == 'fff0').expand((s) => s.characteristics.map((c) => shortUuid(c.uuid.str))).join(',')}\n${redactDiagnostic(trace.join('\n'))}',
       ),
     );
     message('Diagnostics copied.');

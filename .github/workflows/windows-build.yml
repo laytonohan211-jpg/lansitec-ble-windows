@@ -6,15 +6,18 @@ on:
 jobs:
   build:
     runs-on: windows-2022
+    timeout-minutes: 35
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: '3.29.0'
           channel: stable
-          cache: true
+          cache: false
       - name: Prepare dependencies
         shell: pwsh
         run: |
@@ -22,6 +25,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Flutter configuration failed' }
           flutter pub get --enforce-lockfile
           if ($LASTEXITCODE -ne 0) { throw 'Dependency resolution failed' }
+      - name: Record dependency inventory
+        shell: pwsh
+        run: |
+          python tools/release_inventory.py
+          if ($LASTEXITCODE -ne 0) { throw 'Inventory failed' }
       - name: Apply pinned Windows connection fix
         shell: pwsh
         run: |
@@ -57,9 +65,10 @@ jobs:
           $crt = Get-ChildItem "$vs/VC/Redist/MSVC/*/x64/Microsoft.VC143.CRT" -Directory | Sort-Object FullName -Descending | Select-Object -First 1
           if (-not $crt) { throw 'MSVC runtime not found' }
           Copy-Item "$($crt.FullName)/*.dll" $release
+          Copy-Item dist/THIRD_PARTY_NOTICES.txt $release
           Compress-Archive -Path "$release/*" -DestinationPath 'dist/Ls_BLE_Guided_Windows_x64.zip' -Force
           $iscc = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe"
-          if (-not (Test-Path $iscc)) { choco install innosetup --yes --no-progress }
+          if (-not (Test-Path $iscc)) { throw 'Pinned runner installer compiler unavailable' }
           & $iscc installer.iss
           if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
       - name: Check application and installer start
@@ -73,8 +82,9 @@ jobs:
           $setup = Start-Process -FilePath (Resolve-Path 'dist/Ls_BLE_Guided_Windows_Setup.exe') -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR=C:\ble-install-test' -WindowStyle Hidden -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           if (-not (Test-Path 'C:/ble-install-test/Ls_BLE_Guided.exe')) { throw 'Installed executable missing' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Ls-BLE-Guided-Windows-x64
           path: dist/*
           if-no-files-found: error
+

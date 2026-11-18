@@ -12,6 +12,9 @@ class CharacteristicBloc
   static const int maxReadLogCount = 2;
   static const int maxNotifyLogCount = 2000;
 
+  static String boundedValue(String value) => value.length > 8192
+      ? '${value.substring(0, 8192)} [truncated]' : value;
+
   CharacteristicBloc() : super(const CharacteristicState()) {
     on<AddWrittenValue>(_onAddWrittenValue);
     on<AddReadValue>(_onAddReadValue);
@@ -26,7 +29,7 @@ class CharacteristicBloc
     final newMap = Map<String, List<String>>.from(state.writtenLogs);
 
     final list = List<String>.from(newMap[event.uuid] ?? []);
-    list.insert(0, event.value);
+    list.insert(0, boundedValue(event.value));
     if (list.length > maxWriteLogCount) {
       list.removeLast();
     }
@@ -39,7 +42,7 @@ class CharacteristicBloc
     final newMap = Map<String, List<String>>.from(state.readLogs);
 
     final list = List<String>.from(newMap[event.uuid] ?? []);
-    list.insert(0, event.value);
+    list.insert(0, boundedValue(event.value));
     if (list.length > maxReadLogCount) {
       list.removeLast();
     }
@@ -55,7 +58,7 @@ class CharacteristicBloc
     final newMap = Map<String, List<String>>.from(state.notifyLogs);
 
     final list = List<String>.from(newMap[event.uuid] ?? []);
-    list.insert(0, event.value);
+    list.insert(0, boundedValue(event.value));
     if (list.length > maxNotifyLogCount) {
       list.removeLast();
     }

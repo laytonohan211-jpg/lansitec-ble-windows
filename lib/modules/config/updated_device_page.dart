@@ -1,3 +1,4 @@
+import 'package:flutter_blue/utils/safe_export.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_blue/locator.dart';
@@ -285,7 +286,7 @@ class _UpdatedDevicePageState extends State<UpdatedDevicePage> {
         String csv = "Name,MAC,MAJOR,MINOR,TX Power,Interval(ms),Hardware\n";
         for (var d in updatedDevices) {
           csv +=
-              "${d.name},${d.id},${d.major},${d.minor},${d.txPower},${d.interval},${d.hardware}\n";
+              csvRow([d.name,d.id,d.major,d.minor,d.txPower,d.interval,d.hardware]);
         }
 
         try {
