@@ -3,9 +3,13 @@ gradle.projectsEvaluated {
     if (app == null) return
     app.tasks.register('inventoryReleaseDependencies') {
         doLast {
-            def components = app.configurations.getByName('releaseRuntimeClasspath').resolvedConfiguration.resolvedArtifacts.collect {
-                [group: it.moduleVersion.id.group, name: it.moduleVersion.id.name, version: it.moduleVersion.id.version]
-            }.unique().sort { a,b -> "${a.group}:${a.name}" <=> "${b.group}:${b.name}" }
+            def graph = app.configurations.getByName('releaseRuntimeClasspath').incoming.resolutionResult
+            def unresolved = graph.allDependencies.findAll { it instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult }
+            if (!unresolved.empty) throw new GradleException('Dependency graph contains unresolved entries; refusing partial inventory')
+            def components = graph.allComponents.collect { it.id }
+                .findAll { it instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier }
+                .collect { [group: it.group, name: it.module, version: it.version] }
+                .unique().sort { a,b -> "${a.group}:${a.name}" <=> "${b.group}:${b.name}" }
             def out = new File(gradle.rootProject.projectDir.parentFile, 'dist/GRADLE_DEPENDENCIES.json')
             out.parentFile.mkdirs()
             out.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(components))
