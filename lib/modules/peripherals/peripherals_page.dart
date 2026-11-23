@@ -250,6 +250,14 @@ class _PeripheralsPageState extends State<PeripheralsPage> {
               const SizedBox(height: 8),
               Text(device.platformName, style: const TextStyle(fontSize: 14)),
               const SizedBox(height: 12),
+              const Text(
+                'When prompted to pair, complete both steps:\n\n'
+                'Step 1: Pair & Connect → Confirm connection\n\n'
+                'Step 2: Pair & Connect again → Enter password: 116321\n\n'
+                'If you changed the device password, use your current password.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
               const SizedBox(
                 height: 40,
                 width: 40,

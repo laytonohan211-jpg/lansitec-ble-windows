@@ -1,10 +1,10 @@
 /*
- * Shared LoRa and NTN product LoRaWAN uplink decoder.
- * GNSS bytes[1] and bytes[2] both zero: NTN accuracy; otherwise LoRa quality.
+ * LoRaWAN Livestock uplink decoder.
+ * Updated to the user-supplied Livestock functional test workbook (2026-11-23).
  * Compatible with ChirpStack v4, ChirpStack v3, TTN, and Node.js.
  */
 
-var CODEC_VERSION = "5.4.0-unified";
+var CODEC_VERSION = "5.5.0-lorawan";
 var LIVESTOCK_FPORT = 8;
 
 function byteToHex(value) {
@@ -104,11 +104,12 @@ function decodeRegister(bytes, data, errors) {
 function decodeHeartbeat(bytes, data, warnings, errors) {
     var temperatureRaw;
 
-    if (!expectLength(bytes, 7, "Heartbeat message", errors)) {
+    if (!expectLength(bytes, 9, "Heartbeat message", errors)) {
         return;
     }
     data.message_type = "heartbeat";
     data.battery_percent = bytes[1];
+    data.charging_duration_min = readUInt16BE(bytes, 7);
     data.alarm_status = bytes[2];
     data.low_battery_occurred = (bytes[2] & 0x80) !== 0;
     data.geofence_breach_occurred = (bytes[2] & 0x40) !== 0;
@@ -137,14 +138,10 @@ function decodeGnss(bytes, data, errors) {
     data.message_type = "gnss_position";
     data.location_flag = bytes[0] & 0x0F;
     data.location_success = data.location_flag === 1;
-    if (bytes[1] === 0 && bytes[2] === 0) {
-        data.accuracy_m = readUInt32BE(bytes, 1) / 100;
-    } else {
-        data.satellites_visible = bytes[1] === 0xFF ? null : bytes[1];
-        data.satellites_used = bytes[2] === 0xFF ? null : bytes[2];
-        hdopRaw = readUInt16BE(bytes, 3);
-        data.hdop = hdopRaw === 0xFFFF ? null : hdopRaw / 100;
-    }
+    data.satellites_visible = bytes[1] === 0xFF ? null : bytes[1];
+    data.satellites_used = bytes[2] === 0xFF ? null : bytes[2];
+    hdopRaw = readUInt16BE(bytes, 3);
+    data.hdop = hdopRaw === 0xFFFF ? null : hdopRaw / 100;
     longitudeE7 = readInt32BE(bytes, 5);
     latitudeE7 = readInt32BE(bytes, 9);
     data.longitude_e7 = longitudeE7;
@@ -485,4 +482,3 @@ if (typeof module !== "undefined" && module.exports) {
 }
 
 function decodeChecked(hex) { if(typeof hex !== 'string' || !/^[0-9a-f]+$/i.test(hex) || hex.length%2 || hex.length>8192) throw new Error('Invalid hexadecimal payload'); var bytes=[]; for(var i=0;i<hex.length;i+=2)bytes.push(parseInt(hex.substr(i,2),16)); return decodeUplink({fPort:8,bytes:bytes}); }
-

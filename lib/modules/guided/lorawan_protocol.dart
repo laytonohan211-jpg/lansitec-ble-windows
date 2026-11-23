@@ -16,7 +16,8 @@ const loRaFields = {
 };
 
 bool isLoRaGatt(Iterable<String> ids) =>
-    ids.map(shortUuid).toSet().containsAll(['ff81', 'ff82', 'ff84']);
+    ids.map(shortUuid).toSet().containsAll(['ff81', 'ff82', 'ff84']) ||
+    ids.map(shortUuid).toSet().containsAll(['ff84', 'ff87', 'ff89', 'ff8a', 'ff8b', 'ff8c']);
 
 String loRaModelLabel(LoRaModel model) => switch (model) {
   LoRaModel.gateway => 'LoRaWAN Bluetooth Gateway',

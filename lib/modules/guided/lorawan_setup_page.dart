@@ -27,6 +27,15 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
   bool expectedDisconnect = false;
   bool busy = false, linked = false, confirming = false;
   String status = 'Reading available settings…';
+  String sendStatus = '';
+
+  void showSendStatus(String message) {
+    if (!mounted) return;
+    setState(() { status = message; sendStatus = message; });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 8)));
+  }
   int generation = 0;
   Map<String, BluetoothCharacteristic> get characteristics => {
     for (final s in widget.services)
@@ -73,7 +82,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         editors['uuid'] = TextEditingController();
       }
     }
-    setState(() => model = next);
+    setState(() { model = next; sendStatus = ''; });
   }
 
   Future<void> read() async {
@@ -118,7 +127,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         for (final e in editors.entries) e.key: e.value.text,
       });
     } on FormatException catch (e) {
-      setState(() => status = e.message);
+      showSendStatus(e.message);
       return;
     }
     confirming = true;
@@ -132,17 +141,22 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
       ],
     ));
     confirming = false;
-    if (!mounted || ok != true || !linked || busy) return;
+    if (!mounted || ok != true) return;
+    if (!linked) {
+      showSendStatus('Device disconnected. Reconnect before sending settings.');
+      return;
+    }
+    if (busy) return;
     final epoch = generation;
-    setState(() { busy = true; expectedDisconnect = reboot; status = 'Sending…'; });
+    setState(() { busy = true; expectedDisconnect = reboot; status = 'Sending…'; sendStatus = status; });
     try {
       await c.write(loRaWire(command), withoutResponse: !c.properties.write, timeout: 8);
-      if (mounted && epoch == generation) setState(() => status =
+      if (mounted && epoch == generation) showSendStatus(
         reboot ? 'Restart requested' : c.properties.write
-          ? 'Received via Bluetooth. Settings not yet verified.'
+          ? 'Bluetooth write acknowledged. Settings not yet verified.'
           : 'Sent. Device confirmation not received.');
     } catch (e) {
-      if (mounted) setState(() => status = 'Could not confirm delivery: $e');
+      showSendStatus('Could not confirm delivery: $e');
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -160,7 +174,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         IconButton(tooltip: 'Read current fields', onPressed: busy || !linked ? null : read, icon: const Icon(Icons.refresh)),
         IconButton(tooltip: 'Copy diagnostics', onPressed: () async {
           await Clipboard.setData(ClipboardData(text: redactDiagnostic([
-            'Ls BLE Guided 1.6.3 — LoRaWAN', widget.device.platformName,
+            'Ls BLE Guided 1.6.4 — LoRaWAN', widget.device.platformName,
             'Selected model: ${model?.name ?? 'none'}', status,
             for (final e in characteristics.entries)
               '${e.key} ${loRaFields[e.key]} read=${e.value.properties.read} write=${e.value.properties.write} withoutResponse=${e.value.properties.writeWithoutResponse}: ${values[e.key] ?? 'not read'}',
@@ -179,7 +193,18 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         const SizedBox(height: 16),
         const Text('Read from device', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         for (final e in characteristics.entries)
-          Card(child: ListTile(title: Text(loRaFields[e.key]!), subtitle: SelectableText(values[e.key] ?? 'Not read yet'))),
+          Card(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            ListTile(title: Text(loRaFields[e.key]!), subtitle: SelectableText(
+              (values[e.key] ?? 'Not read yet').split('\nRaw: ').first.startsWith('Raw: ')
+                ? 'Binary value'
+                : (values[e.key] ?? 'Not read yet').split('\nRaw: ').first,
+            )),
+            if ((values[e.key] ?? '').contains('Raw: '))
+              ExpansionTile(title: const Text('Raw data'), children: [
+                Padding(padding: const EdgeInsets.all(16),
+                  child: SelectableText(values[e.key]!.split('Raw: ').last)),
+              ]),
+          ])),
         const SizedBox(height: 16),
         const Text('Guided configuration', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         const Text('Select your device.'),
@@ -193,7 +218,7 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
         ),
         if (model != null) ...[
           const Padding(padding: EdgeInsets.symmetric(vertical: 16), child: Text(
-            'New configuration — review all values before applying.')),
+            'Enter every configuration field before sending. Blank fields are not taken from the device. Review all values before applying.')),
           for (final p in loRaParameters(model!))
             Padding(padding: const EdgeInsets.only(bottom: 14), child: TextField(
               controller: editors[p.key], enabled: !busy,
@@ -205,6 +230,10 @@ class _LoRaSetupPageState extends State<LoRaSetupPage> {
             decoration: const InputDecoration(labelText: 'Positioning beacon UUID'),
           ),
           const SizedBox(height: 16),
+          if (sendStatus.isNotEmpty) Padding(
+            padding: const EdgeInsets.only(bottom: 12), child: SelectableText(sendStatus),
+          ),
+          if (!linked) const Text('Device disconnected. Reconnect to send settings.'),
           FilledButton(onPressed: canWrite ? () => send() : null, child: const Text('Review and send settings')),
           OutlinedButton(onPressed: canWrite ? () => send(reboot: true) : null, child: const Text('Reboot device')),
         ],
