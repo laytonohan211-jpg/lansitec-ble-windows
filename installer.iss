@@ -1,7 +1,7 @@
 [Setup]
 AppId={{C7181B89-FBC1-418F-A05F-53D5BB6BE457}
 AppName=Ls BLE Guided
-AppVersion=1.6.3
+AppVersion=1.6.4
 DefaultDirName={localappdata}\Programs\Ls BLE Guided
 DefaultGroupName=Ls BLE Guided
 PrivilegesRequired=lowest
@@ -28,3 +28,4 @@ Name: "{userdesktop}\Ls BLE Guided"; Filename: "{app}\Ls_BLE_Guided.exe"
 
 [Run]
 Filename: "{app}\Ls_BLE_Guided.exe"; Description: "Avvia Ls BLE Guided"; Flags: nowait postinstall skipifsilent
+
