@@ -1,0 +1,7 @@
+LoRaWAN Livestock source precedence — 23 November 2026
+The user-supplied LoRaWAN整机功能测试用例_模板.xlsx supersedes conflicting older Livestock LoRaWAN information. Its source sheet identifies the Livestock product; it is not a replacement protocol for Badge, Cat-1 or other LoRaWAN products.
+The 95 cases are all marked unexecuted, not evidence of hardware tests passed.
+Applied: FFF0/FF89 region, FF8A sub-band, FF8B firmware, FF8C battery, FF87 network; FF84 advanced-command notifications. Heartbeat is 9 bytes including charging minutes; GNSS zero quality values remain zero rather than NTN accuracy. Zero LossLimit means recovery on first failed confirmed transaction. Existing request/query/ACK, motion, geofence and history flows retained.
+Unresolved in this source: Position BLE default (on vs off), GNSS default (30 vs 4 minutes), idle/off current acceptance limits. Do not insert assumed defaults in the app.
+Hardware power, motion, network, factory-test and signed-DFU cases remain physical acceptance procedures. Do not perform resets/OTA automatically or claim these tests passed. Existing external nRF Connect DFU procedure remains applicable; this workbook supplies no in-app DFU transport implementation.
+The workbook does not supply legacy Badge FF84 current-parameter queries or B003 V13 battery support.

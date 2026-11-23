@@ -1,3 +1,4 @@
+import 'livestock_gatt.dart';
 import 'battery_info.dart';
 import 'log_debug_page.dart';
 import 'dart:async';
@@ -23,7 +24,7 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
   void log(String text) { history.add('${sessionClock.elapsedMilliseconds} ms $text'); if(history.length>200)history.removeAt(0); }
   final info=<String,String>{};
   BluetoothCharacteristic? field(String id){final found=widget.services.expand((s)=>s.characteristics).where((c)=>shortUuid(c.uuid.str)==id).toList();return found.length==1?found.first:null;}
-  static const infoLabels={'ff81':'LoRaWAN region','ff82':'LoRaWAN sub-band','ff87':'Network status','battery':'Battery','2a26':'Firmware version'};
+  static const infoLabels=livestockInfoLabels;
   bool busy=false;
   String status='',geofence='',assetRule='';
   int generation=0;
@@ -140,28 +141,22 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     if(!await approve('$title?',id==4?'All tracker settings will be restored to factory defaults.':'Livestock Tracker') || !mounted)return;
     await perform(() async {if(widget.device==null){await copy([0xc0,id]);return;}await exchange([0xc0,id],0x6c,id,width:0);if(mounted)setState(()=>status='$title: confirmed');});
   }
-  int get bandMaximum {
-    final region=(info['ff81']??'').toUpperCase();
-    if(region.contains('CN470'))return 12;
-    if(['US915','AU915','LA915'].any(region.contains))return 8;
-    return 0;
-  }
+  int get bandMaximum => livestockBandMaximum(info['ff89'] ?? '');
   Future<void> editBand() async {
-    final controller=TextEditingController(text:info['ff82']??'AUTO');
+    final controller=TextEditingController(text:info['ff8a']??'AUTO');
     final value=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(title:const Text('LoRaWAN sub-band'),content:TextField(controller:controller,decoration:InputDecoration(helperText:'AUTO or 1–$bandMaximum')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),FilledButton(onPressed:()=>Navigator.pop(ctx,controller.text),child:const Text('Apply'))]));
     Future<void>.delayed(const Duration(milliseconds:400),controller.dispose);
     if(value==null || !mounted)return;
     await perform(()async{
-      final v=value.trim().toUpperCase(),n=int.tryParse(value.trim());
-      if(v!='AUTO' && (n==null || n<0 || n>bandMaximum))throw FormatException('Enter AUTO or 1–$bandMaximum');
-      final c=field('ff82');if(c==null || !connected)throw StateError('Connect to the tracker first.');
+      final v=livestockBandInput(value,bandMaximum);
+      final c=field('ff8a');if(c==null || !connected)throw StateError('Connect to the tracker first.');
       final epoch=generation;
       await c.write(utf8.encode(v),withoutResponse:!c.properties.write,timeout:5);
-      info.remove('ff82');
+      info.remove('ff8a');
       final read=utf8.decode(await c.read(timeout:3)).replaceAll(RegExp(r'\x00+$'),'').trim().toUpperCase();
       if(!mounted || epoch!=generation)return;
       final same=read==v || (['AUTO','0'].contains(read) && ['AUTO','0'].contains(v));
-      setState((){info['ff82']=read;status=same?'Sub-band saved. Restart the tracker to apply.':'Device returned a different sub-band';});
+      setState((){info['ff8a']=read;status=same?'Sub-band saved. Restart the tracker to apply.':'Device returned a different sub-band';});
     });
   }
   Future<void> decode() async {
@@ -172,12 +167,13 @@ class _LivestockSetupPageState extends State<LivestockSetupPage> {
     try{final payload=lsHex(lsBytes(raw));final decoded=await const MethodChannel('lansitec/decoder').invokeMethod<String>('decode',{'family':'livestock','payload':payload});if(!mounted)return;await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(title:const Text('Livestock report'),content:SingleChildScrollView(child:SelectableText(const JsonEncoder.withIndent('  ').convert(jsonDecode(decoded??'{}')))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Close'))]));}catch(e){if(mounted)setState(()=>status='Could not decode report: $e');}
   }
   @override Widget build(BuildContext context)=>DisconnectGuard(connected:connected,busy:busy,child:Scaffold(
-    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[logDebugButton(context,widget.device,field('ff86'),busy:busy),IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:redactDiagnostic(['Ls BLE Guided 1.6.3', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n'))));},icon:const Icon(Icons.copy))]),
+    appBar:AppBar(title:const Text('Livestock Tracker'),actions:[logDebugButton(context,widget.device,field('ff86'),busy:busy),IconButton(tooltip:'Refresh',onPressed:busy||!connected?null:readAll,icon:const Icon(Icons.refresh)),IconButton(tooltip:'Copy diagnostics',onPressed:()async{await Clipboard.setData(ClipboardData(text:redactDiagnostic(['Ls BLE Guided 1.6.4', 'Model: LoRaWAN Livestock Tracker', 'Device: ${widget.device?.platformName}', 'ID: ${widget.device?.remoteId.str}', 'Info: $info',status,...history].join('\n'))));},icon:const Icon(Icons.copy))]),
     body:ListView(padding:const EdgeInsets.all(16),children:[
       if(busy)const LinearProgressIndicator(),
         const ExpansionTile(title: Text('Reporting and connection help'), children: [Padding(padding: EdgeInsets.all(12), child: Text('A Bluetooth connection confirms only the local link. Check LoRaWAN join and uplink reception separately in your network server. For devices with GNSS, heartbeat does not guarantee a new position: check positioning enable, reporting interval and search duration, then verify a timestamped fix outdoors. Use downlinks for this model and transport; do not copy cellular MQTT commands. If reports are missing, copy diagnostics and Log & Debug messages and email alessandro.paperi@lansitec.com with model, firmware and time of the issue.'))]),
       if(status.isNotEmpty)Padding(padding:const EdgeInsets.symmetric(vertical:12),child:SelectableText(status)),
-      for(final entry in info.entries)ListTile(title:Text(infoLabels[entry.key]!),subtitle:Text(entry.value),trailing:entry.key=='ff82' && bandMaximum>0?const Icon(Icons.edit):null,onTap:entry.key=='ff82' && bandMaximum>0 && !busy?editBand:null),
+      const ExpansionTile(title: Text('Positioning and reporting'), children: [Padding(padding: EdgeInsets.all(12), child: Text('A zero positioning interval stops periodic reports; Request position can still use enabled positioning methods. In Bluetooth priority mode, matching beacons suppress periodic GNSS. Independent mode schedules both separately. Loss limit 0 or 1 starts network recovery after the first failed confirmed-heartbeat transaction. History stores up to 100 eligible reports in RAM after loss of an established network connection; it is lost on restart.'))]),
+      for(final entry in info.entries)ListTile(title:Text(infoLabels[entry.key]!),subtitle:Text(entry.value),trailing:entry.key=='ff8a' && bandMaximum>0?const Icon(Icons.edit):null,onTap:entry.key=='ff8a' && bandMaximum>0 && !busy?editBand:null),
       for(final group in livestockParameters.map((p)=>p.group).toSet())...[
         Padding(padding:const EdgeInsets.only(top:20,bottom:8),child:Text(group,style:Theme.of(context).textTheme.titleLarge)),
         for(final p in livestockParameters.where((p)=>p.group==group))Card(child:ListTile(title:Text(p.name),subtitle:Text(values.containsKey(p.id)?p.display(values[p.id]!):'—'),trailing:const Icon(Icons.chevron_right),onTap:busy || (widget.device!=null && !connected)?null:()=>edit(p))),
